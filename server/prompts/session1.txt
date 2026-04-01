@@ -1,0 +1,57 @@
+Session: 1 - 문제 인터뷰 (Problem Interview)
+
+Rules you MUST follow without exception:
+- NEVER mention any solution, product, feature, idea, or future possibility.
+- ONLY talk about current problems, past experiences, frustrations, and workarounds.
+- All questions MUST be open-ended, non-leading, focused on past behavior or current reality.
+- No yes/no questions. No hypothetical "would you" questions.
+- Prioritize revealing: emotional impact, time/money lost, frequency, current coping methods.
+
+---
+
+## 세션 1 목적 (PRD 8.3)
+
+고객이 실제로 이 문제를 겪고 있는지, 그리고 그 문제가 얼마나 심각한지를 검증합니다.
+창업자의 가설(이 문제가 존재한다)을 확인 또는 반증하는 것이 목표입니다.
+
+## 절대 금지 사항
+
+- 솔루션 / 제품 / 기능 / 아이디어 언급 금지
+- "만약 이런 게 있다면?" 같은 가상 시나리오 금지
+- 지불 의향 / 가격 관련 질문 금지 (세션 4에서 다룸)
+- MVP, 프로토타입 관련 질문 금지 (세션 3에서 다룸)
+- "이게 불편하지 않으셨나요?" 같은 유도 질문 금지
+- Yes/No로 끝나는 닫힌 질문 금지
+
+## 필수 탐색 영역 (아래 영역을 골고루 커버할 것)
+
+1. 현재 행동 패턴: 고객이 지금 이 문제를 어떻게 처리하고 있는가?
+2. 불편함의 빈도와 강도: 얼마나 자주, 얼마나 심하게 겪는가?
+3. 현재 대안: 지금 어떤 방법/도구/서비스를 쓰고 있는가?
+4. 그 대안의 한계: 현재 방법의 어떤 점이 불만족스러운가?
+5. 문제의 결과: 이 문제 때문에 실제로 어떤 손해(시간/돈/감정)가 발생하는가?
+
+## 질문 흐름 순서 (이 순서로 배치할 것)
+
+- 1~2번: 고객의 현재 상황과 역할 파악 (워밍업)
+- 3~5번: 문제가 발생하는 구체적 상황 탐색
+- 6~8번: 현재 어떻게 해결하고 있는지 + 그 한계 심화 탐색
+- 9~11번: 문제의 실제 영향(시간/돈/감정) 탐색
+- 12~15번: 가장 힘든 순간 + Magic Wand 스타일 마무리
+
+## 코멘트 필수 요소 (PRD 8.3)
+
+각 질문의 왜(why) 필드에 반드시 포함:
+- 린 고객개발 원칙 연결 설명
+- 기대 Pain 강도 판단 기준
+- 공감 리액션 예시 (예: "힘들었겠어요, 더 자세히 들려주실 수 있을까요?")
+
+## 품질 검증 기준 (PRD 8.7.4)
+
+생성 후 자체 검증:
+- 해결책 언급 0건 (위반 시 즉시 수정)
+- 후속 질문에 "왜"를 묻는 질문 3회 이상 포함
+- 구체적 사례/시점을 요구하는 질문 전체의 70% 이상
+- 질문은 반드시 최소 12개 생성
+- 동일 테마(실패/감정) 중복 금지
+- 필수/옵션 레이어 구분

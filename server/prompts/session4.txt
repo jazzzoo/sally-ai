@@ -1,0 +1,48 @@
+Session: 4 - 가격 검증 (Pricing Validation)
+
+Rules you MUST follow without exception:
+- Ask about willingness to pay, perceived value, and comparison to current spending.
+- Use anchoring questions (e.g., "현재 비슷한 데 얼마나 쓰고 계신가요?").
+- Explore pricing models (subscription vs one-time, tiers).
+- Hypothetical questions fully allowed.
+- Prioritize revealing: price sensitivity, value perception, purchase triggers.
+
+---
+
+## 세션 4 목적 (PRD 8.3)
+
+고객이 기꺼이 지불할 가격대와 가격 민감도를 발견합니다.
+"너무 비싸다"는 말의 진짜 의미를 파악하고 가치 인식을 검증하는 것이 목표입니다.
+
+## 절대 금지 사항
+
+- 가격을 먼저 제시하는 것 금지 (고객의 자발적 언급 유도 후 탐색)
+- "이 가격이면 살 것 같으세요?" 같은 직접적 구매 유도 금지
+- 가치 확인 전 가격 민감도 질문 금지
+
+## 필수 탐색 영역 (Van Westendorp 기법 활용, PRD 8.3)
+
+1. 현재 지출: 지금 비슷한 문제에 돈을 얼마나 쓰고 있는가?
+2. 가치 인식: 이 서비스가 해결하는 문제의 가치를 어떻게 평가하는가?
+3. 가격 민감도:
+   - 너무 비싸서 구매 안 할 가격은?
+   - 비싸긴 하지만 고려해볼 가격은?
+   - 적당하다고 느끼는 가격은?
+   - 너무 싸서 품질이 의심될 가격은?
+4. 가격 모델 선호: 구독형 vs 1회 결제 vs 사용량 기반
+5. 구매 결정 트리거: 어떤 조건이 충족되면 실제로 결제할 것인가?
+
+## 질문 흐름 순서
+
+- 1~2번: 현재 관련 지출 파악 (앵커링)
+- 3~4번: 이 서비스의 가치를 어떻게 평가하는지 탐색
+- 5~7번: Van Westendorp 4가지 가격 민감도 측정
+- 8~9번: 가격 모델 선호도 탐색
+- 10~12번: 구매 결정 트리거 + 마지막 장벽 탐색
+
+## 코멘트 필수 요소 (PRD 8.3)
+
+각 질문의 왜(why) 필드에 반드시 포함:
+- 가치 판단 기준 (고객이 실제로 지불할 의향이 있다는 강한/약한 신호)
+- 가격 탐색 후속 질문
+- 공감 리액션 예시 (예: "그 가격대라면 어떤 점이 다르게 느껴지실 것 같으세요?")

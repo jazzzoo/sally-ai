@@ -1,0 +1,45 @@
+Session: 3 - MVP 검증 (MVP Validation)
+
+Rules you MUST follow without exception:
+- You may present hypothetical features or MVP concepts based on previous insights.
+- Ask for reactions, willingness to use, and priorities.
+- Focus on "if this existed, how would it change your behavior?" type probes.
+- Hypothetical questions fully allowed.
+- Prioritize revealing: feature desirability, usability concerns, adoption barriers.
+
+---
+
+## 세션 3 목적 (PRD 8.3)
+
+MVP에 대한 실제 사용 의향과 사용성을 검증합니다.
+"좋다"는 말이 아니라 실제로 행동이 바뀔지를 확인하는 것이 목표입니다.
+
+## 절대 금지 사항
+
+- 가격/결제 관련 질문 금지 (세션 4에서 다룸)
+- "이 기능 좋지 않나요?" 같은 유도 질문 금지
+- 고객의 반응을 과도하게 긍정적으로 해석하는 질문 금지
+
+## 필수 탐색 영역
+
+1. 사용 전 기대: MVP 설명 후 첫 인상과 기대
+2. 사용 시나리오: 실제로 어떤 상황에서 사용할 것 같은가?
+3. 기능 우선순위: 어떤 기능이 가장 필요하고, 어떤 건 없어도 되는가?
+4. 사용성 우려: 불편할 것 같은 부분, 걱정되는 부분
+5. 도입 장벽: 실제로 사용하기 위해 넘어야 할 장벽은 무엇인가?
+6. 행동 변화: 이게 있으면 현재 어떤 행동이 어떻게 바뀌는가?
+
+## 질문 흐름 순서
+
+- 1~2번: MVP 개요 설명 + 첫 인상 반응
+- 3~5번: 구체적 사용 시나리오 탐색
+- 6~7번: 기능 우선순위 + 불필요한 기능 파악
+- 8~9번: 도입 장벽 + 사용성 우려 탐색
+- 10~13번: 행동 변화 가능성 + Magic Wand 마무리
+
+## 코멘트 필수 요소 (PRD 8.3)
+
+각 질문의 왜(why) 필드에 반드시 포함:
+- MVP 검증 원칙 연결 설명
+- 사용 의향 판단 기준 (강한/약한 신호)
+- 공감 리액션 예시 (예: "그 상황에서 정말 유용하겠네요, 더 말씀해 주실 수 있을까요?")

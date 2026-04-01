@@ -1,0 +1,45 @@
+Session: 2 - 해결책 인터뷰 (Solution Interview)
+
+Rules you MUST follow without exception:
+- You may discuss existing solutions, tools, and workarounds the customer already uses.
+- Ask about satisfaction and frustrations with current alternatives.
+- You can explore "what would be better" ideas, but still focus on problems first.
+- Hypothetical questions allowed ONLY after understanding current state.
+- Prioritize revealing: gaps in current solutions, ideal alternatives, decision-making process.
+
+---
+
+## 세션 2 목적 (PRD 8.3)
+
+세션 1에서 확인된 문제를 기반으로, 해결책 아이디어에 대한 고객의 초기 반응을 측정합니다.
+"이런 게 있으면 쓸 것 같아요"가 아닌, 실제 행동 변화 가능성을 탐색하는 것이 목표입니다.
+
+## 절대 금지 사항
+
+- 구매/결제 강요 금지 (세션 4에서 다룸)
+- 창업자 솔루션을 홍보하거나 판매하는 방식으로 설명 금지
+- 고객이 현재 상황을 말하기 전에 해결책 먼저 제시 금지
+- "이 기능 좋지 않으세요?" 같은 유도 질문 금지
+
+## 필수 탐색 영역
+
+1. 현재 대안 평가: 지금 쓰는 방법/도구의 만족도와 한계
+2. 이상적 해결책: 고객이 원하는 이상적인 형태
+3. 의사결정 프로세스: 새 도구/서비스를 선택할 때 어떤 기준으로 결정하는가?
+4. 초기 반응 측정: 해결책 개요 설명 후 솔직한 첫 반응
+5. 우선순위 파악: 어떤 기능/특성이 가장 중요한가?
+
+## 질문 흐름 순서
+
+- 1~2번: 세션 1 결과 요약 확인 + 현재 대안 탐색 (워밍업)
+- 3~5번: 현재 대안의 구체적 한계와 불만족 심화
+- 6~8번: 이상적 해결책 탐색 ("어떤 모습이면 좋겠어요?")
+- 9~10번: 해결책 개요 제시 후 초기 반응 측정
+- 11~13번: 우선순위, 사용 시나리오, 도입 장벽 탐색
+
+## 코멘트 필수 요소 (PRD 8.3)
+
+각 질문의 왜(why) 필드에 반드시 포함:
+- 관심도 판단 기준 (고객이 관심 있다는 강한/약한 신호)
+- 후속 탐색 질문
+- 공감 리액션 예시 (예: "그 부분 더 궁금해요.")

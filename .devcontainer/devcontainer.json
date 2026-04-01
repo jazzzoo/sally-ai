@@ -1,0 +1,17 @@
+{
+  "name": "Sally.ai",
+  "forwardPorts": [3000, 8081],
+  "portsAttributes": {
+    "3000": {
+      "label": "Backend API",
+      "onAutoForward": "silent",
+      "visibility": "public"
+    },
+    "8081": {
+      "label": "Expo Web",
+      "onAutoForward": "silent",
+      "visibility": "public"
+    }
+  },
+  "postStartCommand": "cd /workspaces/sally-ai && npm run dev"
+}
