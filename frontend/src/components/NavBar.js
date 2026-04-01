@@ -41,7 +41,7 @@ export default function NavBar({ onLogoPress }) {
       </View>
 
       {/* 오른쪽: guest 상태 */}
-      <Text style={styles.guestLabel}>계정 없이 사용 중 · guest</Text>
+      <Text style={styles.guestLabel}>Using as guest · no account</Text>
     </View>
   );
 }

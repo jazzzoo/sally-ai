@@ -102,49 +102,52 @@ router.post('/', authenticateGuest, async (req, res) => {
 });
 
 // ─────────────────────────────────────────
+// GET /api/sessions/history
+// 히스토리 목록 조회
+// ─────────────────────────────────────────
+router.get('/history', authenticateGuest, async (req, res) => {
+  try {
+    const result = await withRLS(req.guestId, async (client) => {
+      return client.query(
+        `SELECT ql.id, ql.title, ql.is_favorite, ql.created_at,
+                s.input_context
+         FROM question_lists ql
+         JOIN sessions s ON ql.session_id = s.id
+         JOIN projects p ON s.project_id = p.id
+         WHERE p.guest_id = $1
+         ORDER BY ql.is_favorite DESC, ql.created_at DESC`,
+        [req.guestId]
+      );
+    });
+    return res.json({ success: true, history: result.rows });
+  } catch (err) {
+    console.error('[Sessions] history error:', err.message);
+    return res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR' } });
+  }
+});
+
+// ─────────────────────────────────────────
 // GET /api/sessions/:id
 // 세션 상세 조회
 // ─────────────────────────────────────────
-router.get('/history', authenticateGuest, async (req, res) => {
-    try {
-        const result = await withRLS(req.guestId, async (client) => {
-            return client.query(
-                `SELECT ql.id, ql.title, ql.is_favorite, ql.created_at,
-                        s.input_context
-                 FROM question_lists ql
-                 JOIN sessions s ON ql.session_id = s.id
-                 JOIN projects p ON s.project_id = p.id
-                 WHERE p.guest_id = $1
-                 ORDER BY ql.is_favorite DESC, ql.created_at DESC`,
-                [req.guestId]
-            );
-        });
-        return res.json({ success: true, history: result.rows });
-    } catch (err) {
-        console.error('[Sessions] history error:', err.message);
-        return res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR' } });
-    }
 router.get('/:id', authenticateGuest, async (req, res) => {
   const { id } = req.params;
-
-  // generate-stream 경로와 충돌 방지
-  if (id === 'generate-stream') return res.status(404).end();
 
   try {
     const result = await withRLS(req.guestId, async (client) => {
       return client.query(
         `SELECT s.*,
-                json_agg(
-                  json_build_object(
-                    'id', ql.id,
-                    'version', ql.version,
-                    'created_at', ql.created_at
-                  ) ORDER BY ql.version DESC
-                ) FILTER (WHERE ql.id IS NOT NULL) as question_lists
-         FROM sessions s
-         LEFT JOIN question_lists ql ON ql.session_id = s.id
-         WHERE s.id = $1
-         GROUP BY s.id`,
+              json_agg(
+                json_build_object(
+                  'id', ql.id,
+                  'version', ql.version,
+                  'created_at', ql.created_at
+                ) ORDER BY ql.version DESC
+              ) FILTER (WHERE ql.id IS NOT NULL) as question_lists
+       FROM sessions s
+       LEFT JOIN question_lists ql ON ql.session_id = s.id
+       WHERE s.id = $1
+       GROUP BY s.id`,
         [id]
       );
     });
@@ -169,16 +172,14 @@ router.get('/:id', authenticateGuest, async (req, res) => {
 // ─────────────────────────────────────────
 // GET /api/sessions/:id/generate-stream
 // SSE 스트리밍 질문 생성
-//
-// SSE 이벤트 흐름:
-//   start → token(반복) → complete → done
-//   에러 시: error → done
-//
-// [변경] POST → GET (SSE 표준은 GET)
-// [변경] sendEvent에 event: 필드 추가 (이벤트명 구분)
 // ─────────────────────────────────────────
 router.get('/:id/generate-stream', authenticateGuest, async (req, res) => {
   const { id: sessionId } = req.params;
+
+  // ── HEAD 요청 처리 (rate limit 체크용) ──
+  if (req.method === 'HEAD') {
+    return res.status(200).end();
+  }
 
   // ── Rate Limit 체크 ──
   if (!checkDailyLimit(req.guestId)) {
@@ -212,7 +213,7 @@ router.get('/:id/generate-stream', authenticateGuest, async (req, res) => {
   res.setHeader('X-Accel-Buffering', 'no');
   res.flushHeaders();
 
-  // ── SSE 전송 헬퍼 (event: 필드 포함) ──
+  // ── SSE 전송 헬퍼 ──
   const sendEvent = (eventName, data) => {
     res.write(`event: ${eventName}\ndata: ${JSON.stringify(data)}\n\n`);
   };
@@ -223,9 +224,9 @@ router.get('/:id/generate-stream', authenticateGuest, async (req, res) => {
     const sessionResult = await withRLS(req.guestId, async (client) => {
       return client.query(
         `SELECT s.*, p.guest_id
-         FROM sessions s
-         JOIN projects p ON s.project_id = p.id
-         WHERE s.id = $1`,
+       FROM sessions s
+       JOIN projects p ON s.project_id = p.id
+       WHERE s.id = $1`,
         [sessionId]
       );
     });
@@ -312,22 +313,22 @@ router.get('/:id/generate-stream', authenticateGuest, async (req, res) => {
       await withRLS(req.guestId, async (client) => {
         const versionResult = await client.query(
           `SELECT COALESCE(MAX(version), 0) + 1 as next_version
-           FROM question_lists WHERE session_id = $1`,
+         FROM question_lists WHERE session_id = $1`,
           [sessionId]
         );
         const version = versionResult.rows[0].next_version;
 
         const qlResult = await client.query(
-          `INSERT INTO question_lists (session_id, version, questions)
-           VALUES ($1, $2, $3)
+          `INSERT INTO question_lists (session_id, version, questions, title)
+           VALUES ($1, $2, $3, $4)
            RETURNING id`,
-          [sessionId, version, JSON.stringify(parsed)]
+          [sessionId, version, JSON.stringify(parsed), inputContext?.business_summary || null]
         );
         questionListId = qlResult.rows[0].id;
 
         await client.query(
           `INSERT INTO analytics_events
-             (guest_id, project_id, session_id, event_type, event_data)
+           (guest_id, project_id, session_id, event_type, event_data)
            VALUES ($1, $2, $3, $4, $5)`,
           [
             req.guestId,
@@ -348,8 +349,8 @@ router.get('/:id/generate-stream', authenticateGuest, async (req, res) => {
       });
     } catch (dbErr) {
       console.error('[Sessions] DB save error:', dbErr.message);
-      // DB 저장 실패해도 complete는 보냄 (question_list_id가 undefined일 수 있음)
     }
+
     // ── 개별 질문 이벤트 전송 ──
     for (const ice of parsed.icebreakers || []) {
       sendEvent('icebreaker', {
@@ -364,7 +365,7 @@ router.get('/:id/generate-stream', authenticateGuest, async (req, res) => {
       sendEvent('question', {
         type: 'question',
         number: i + 1,
-        index: i,              // ← 추가
+        index: i,
         text: q.text || q.question_text || '',
         why: q.why || '',
         follow_up: Array.isArray(q.follow_up) ? q.follow_up
@@ -372,6 +373,7 @@ router.get('/:id/generate-stream', authenticateGuest, async (req, res) => {
             : [],
       });
     }
+
     // ── 완료 이벤트 ──
     sendEvent('complete', {
       question_list_id: questionListId,
@@ -397,12 +399,6 @@ router.get('/:id/generate-stream', authenticateGuest, async (req, res) => {
       res.end();
     }
   }
-});
-
-// ─────────────────────────────────────────
-// GET /api/sessions/history
-// 히스토리 목록 조회
-// ─────────────────────────────────────────
 });
 
 export default router;

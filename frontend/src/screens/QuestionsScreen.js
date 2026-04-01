@@ -15,7 +15,7 @@ export default function QuestionsScreen() {
 
   useFocusEffect(
     React.useCallback(() => {
-      const title = sessionForm.businessSummary.trim().slice(0, 24) || '질문 목록';
+      const title = sessionForm.businessSummary.trim().slice(0, 24) || 'Question List';
       setNavTitle(title);
     }, [])
   );

@@ -11,7 +11,7 @@ import { Star, Trash2, Pencil } from 'lucide-react-native';
 import ModalDialog from './ModalDialog';
 
 export default function HistorySidebar({ onSelect }) {
-  const { currentListId, setCurrentListId, setQuestionList } = useStore();
+  const { currentListId, setCurrentListId, setQuestionList, updateListTitle, historyRefresh } = useStore();
   const [history, setHistory] = useState([]);
   const [editModal, setEditModal] = useState({ visible: false, item: null, text: '' });
   const [deleteModal, setDeleteModal] = useState({ visible: false, item: null });
@@ -27,13 +27,12 @@ export default function HistorySidebar({ onSelect }) {
 
   useEffect(() => {
     loadHistory();
-  }, [currentListId]);
+  }, [historyRefresh]);
 
   async function handleSelect(item) {
     try {
       const res = await questionListsApi.get(item.id);
       setQuestionList(item.id, res.question_list);
-      setCurrentListId(item.id);
       onSelect?.(item.id);
     } catch (err) {
       window.alert('불러오기 실패: ' + err.message);
@@ -42,14 +41,15 @@ export default function HistorySidebar({ onSelect }) {
 
   async function handleFavorite(e, item) {
     e.stopPropagation?.();
+    // 즉시 UI 반영 (optimistic)
+    setHistory((prev) =>
+      prev.map((h) => h.id === item.id ? { ...h, is_favorite: !h.is_favorite } : h)
+        .sort((a, b) => b.is_favorite - a.is_favorite || new Date(b.created_at) - new Date(a.created_at))
+    );
     try {
       await questionListsApi.favorite(item.id);
-      setHistory((prev) =>
-        prev.map((h) => h.id === item.id ? { ...h, is_favorite: !h.is_favorite } : h)
-          .sort((a, b) => b.is_favorite - a.is_favorite || new Date(b.created_at) - new Date(a.created_at))
-      );
     } catch (err) {
-      window.alert('즐겨찾기 실패: ' + err.message);
+      window.alert('Favorite failed: ' + err.message);
     }
   }
 
@@ -65,7 +65,7 @@ export default function HistorySidebar({ onSelect }) {
       setHistory((prev) => prev.filter((h) => h.id !== item.id));
       setDeleteModal({ visible: false, item: null });
     } catch (err) {
-      window.alert('삭제 실패: ' + err.message);
+      window.alert('Delete failed: ' + err.message);
     }
   }
 
@@ -85,24 +85,24 @@ export default function HistorySidebar({ onSelect }) {
       setHistory((prev) =>
         prev.map((h) => h.id === item.id ? { ...h, title: text.trim() } : h)
       );
+      updateListTitle(item.id, text.trim()); // ← store도 업데이트
       setEditModal({ visible: false, item: null, text: '' });
     } catch (err) {
-      window.alert('수정 실패: ' + err.message);
+      window.alert('Edit failed: ' + err.message);
     }
   }
 
   return (
     <View style={styles.container}>
-      <Text style={styles.header}>히스토리</Text>
+      <Text style={styles.header}>History</Text>
       <ScrollView contentContainerStyle={styles.scroll}>
         {history.length === 0 && (
-          <Text style={styles.empty}>생성된 질문이 없습니다</Text>
+          <Text style={styles.empty}>No questions generated yet</Text>
         )}
         {history.map((item) => {
           const isActive = item.id === currentListId;
-          const displayTitle = item.title ||
-            item.input_context?.business_summary?.slice(0, 20) ||
-            '제목 없음';
+          const fullTitle = item.title || item.input_context?.business_summary || 'Untitled';
+          const displayTitle = fullTitle.length > 20 ? fullTitle.slice(0, 20) + '...' : fullTitle;
 
           return (
             <TouchableOpacity
@@ -124,49 +124,49 @@ export default function HistorySidebar({ onSelect }) {
               </TouchableOpacity>
 
               {/* 제목 */}
-              {editingId === item.id ? (
-                <TextInput
-                  style={styles.editInput}
-                  value={editText}
-                  onChangeText={setEditText}
-                  autoFocus
-                  onSubmitEditing={() => handleEditSave(item)}
-                />
-              ) : (
-                <Text
-                  style={[styles.title, isActive && styles.titleActive]}
-                  numberOfLines={1}
-                >
-                  {displayTitle}
-                </Text>
-              )}
+              <Text
+                style={[styles.title, isActive && styles.titleActive]}
+                numberOfLines={1}
+              >
+                {displayTitle}
+              </Text>
 
               {/* 액션 버튼 */}
               <View style={styles.actions}>
-                {editingId === item.id ? (
-                  <>
-                    <TouchableOpacity onPress={() => handleEditSave(item)}>
-                      <Check size={13} color={colors.primaryMid} />
-                    </TouchableOpacity>
-                    <TouchableOpacity onPress={() => setEditingId(null)}>
-                      <X size={13} color={colors.textDisabled} />
-                    </TouchableOpacity>
-                  </>
-                ) : (
-                  <>
-                    <TouchableOpacity onPress={(e) => handleEditStart(e, item)}>
-                      <Pencil size={13} color={colors.textDisabled} />
-                    </TouchableOpacity>
-                    <TouchableOpacity onPress={(e) => handleDelete(e, item)}>
-                      <Trash2 size={13} color={colors.textDisabled} />
-                    </TouchableOpacity>
-                  </>
-                )}
+                <TouchableOpacity onPress={(e) => handleEditStart(e, item)}>
+                  <Pencil size={13} color={colors.textDisabled} />
+                </TouchableOpacity>
+                <TouchableOpacity onPress={(e) => handleDeleteStart(e, item)}>
+                  <Trash2 size={13} color={colors.textDisabled} />
+                </TouchableOpacity>
               </View>
             </TouchableOpacity>
           );
         })}
       </ScrollView>
+      {/* 편집 모달 */}
+      <ModalDialog
+        visible={editModal.visible}
+        title="Edit Title"
+        mode="input"
+        inputValue={editModal.text}
+        onChangeInput={(t) => setEditModal((prev) => ({ ...prev, text: t }))}
+        onConfirm={handleEditSave}
+        onCancel={() => setEditModal({ visible: false, item: null, text: '' })}
+        confirmLabel="Save"
+      />
+
+      {/* 삭제 모달 */}
+      <ModalDialog
+        visible={deleteModal.visible}
+        title="Confirm Delete"
+        message="Are you sure? This cannot be undone."
+        mode="confirm"
+        onConfirm={handleDeleteConfirm}
+        onCancel={() => setDeleteModal({ visible: false, item: null })}
+        confirmLabel="Delete"
+        confirmColor="#FF5C5C"
+      />
     </View>
   );
 }
@@ -184,8 +184,6 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: colors.textSecondary,
     padding: spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
     letterSpacing: 0.5,
     textTransform: 'uppercase',
   },
@@ -208,9 +206,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.sm,
   },
   itemActive: {
-    backgroundColor: colors.background,
-    borderWidth: 1,
-    borderColor: colors.border,
+    backgroundColor: '#D8DFE8',
   },
   starBtn: { padding: 2 },
   title: {

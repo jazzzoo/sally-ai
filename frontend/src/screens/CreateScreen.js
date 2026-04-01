@@ -24,8 +24,8 @@ import { sessionsApi, streamGenerateQuestions, questionListsApi } from '../api/c
 import { colors, gradientColors, spacing, radius, textStyles } from '../theme';
 import { ChevronsLeft, ChevronsRight } from 'lucide-react-native';
 
-const STYLE_OPTIONS = ['중립', '깊게', '부드럽게'];
-const STYLE_MAP = { '중립': '기본', '깊게': '깊게', '부드럽게': '부드럽게' };
+const STYLE_OPTIONS = ['Neutral', 'Deep', 'Soft'];
+const STYLE_MAP = { 'Neutral': '기본', 'Deep': '깊게', 'Soft': '부드럽게' };
 const MAX_SUMMARY = 1000;
 const MOBILE_BP = 700;
 
@@ -67,7 +67,7 @@ function DotIndicator() {
         />
       ))}
       <Text style={{ fontSize: 14, color: colors.textSecondary, marginLeft: 6 }}>
-        Sally가 생각 중...
+        Sally is thinking...
       </Text>
     </View>
   );
@@ -104,7 +104,7 @@ function AnimatedCard({ item, index }) {
         borderLeftColor: isIce ? colors.primaryMid : colors.primary,
       }]}>
         <Text style={{ fontSize: 14, color: isIce ? colors.primaryMid : colors.textDisabled, fontWeight: '700', marginBottom: 4 }}>
-          {isIce ? '✦ 아이스브레이킹' : `Q${item.number}`}
+          {isIce ? '✦ Icebreaker' : `Q${item.number}`}
         </Text>
         <Text style={{ fontSize: 17, color: colors.textPrimary, lineHeight: 20 }}>
           {item.text}
@@ -137,7 +137,7 @@ export default function CreateScreen({ navigation }) {
     isGenerating, setIsGenerating, generatedItems,
     cancelStream, appendGeneratedItem, setCloseStream,
     setCurrentSession, setNavTitle,
-    setQuestionList, setCurrentListId,
+    setQuestionList, setCurrentListId, setHistoryRefresh,
     currentListId, questionListCache,
   } = useStore();
 
@@ -152,7 +152,7 @@ export default function CreateScreen({ navigation }) {
 
   useFocusEffect(
     React.useCallback(() => {
-      setNavTitle('인터뷰 정보 입력 중...');
+      setNavTitle('Preparing interview...');
       // 새로고침 후 복원
       if (currentListId && questionListCache[currentListId]) {
         setMode('questions');
@@ -173,11 +173,11 @@ export default function CreateScreen({ navigation }) {
   // ── 생성 시작 ────────────────────────────────────────────
   async function handleGenerate() {
     if (!canSubmit) {
-      Alert.alert('입력 필요', '사업/제품 요약을 20자 이상 입력해주세요.');
+      Alert.alert('Required', 'Please enter at least 20 characters.');
       return;
     }
     setIsLoading(true);
-    setNavTitle('질문 생성하기 →');
+    setNavTitle('Generating Questions →');
 
     try {
       // 1. 세션 생성
@@ -191,7 +191,7 @@ export default function CreateScreen({ navigation }) {
 
       // [수정] res.session (res.data?.session 아님)
       const session = res.session;
-      if (!session?.id) throw new Error('세션 ID를 받지 못했습니다.');
+      if (!session?.id) throw new Error('Failed to receive session ID.');
       setCurrentSession(session);
 
       console.log('[DEBUG] 세션 생성 성공:', session.id);
@@ -199,7 +199,7 @@ export default function CreateScreen({ navigation }) {
       resetGeneration();
       setMode('generating');
       setIsGenerating(true);
-      setNavTitle('질문 생성 중...');
+      setNavTitle('Generating...');
 
       // 2. SSE 스트리밍 시작
       console.log('[DEBUG] streamGenerateQuestions 호출 시작');
@@ -208,17 +208,11 @@ export default function CreateScreen({ navigation }) {
 
         // token: 타이핑 미리보기만
         onIcebreaker: (item) => {
-          appendGeneratedItem(item);
-        },
-        onIcebreaker: (item) => {
           console.log('[DEBUG] icebreaker 수신:', item.text?.slice(0, 20));
           appendGeneratedItem(item);
         },
         onQuestion: (item) => {
           console.log('[DEBUG] question 수신:', item.number);
-          appendGeneratedItem(item);
-        },
-        onQuestion: (item) => {
           appendGeneratedItem(item);
         },
 
@@ -231,7 +225,7 @@ export default function CreateScreen({ navigation }) {
             console.error('[DEBUG] question_list_id 없음');
             setIsGenerating(false);
             setMode('input');
-            Alert.alert('오류', '질문 리스트 ID를 받지 못했습니다.');
+            Alert.alert('Error', 'Failed to receive question list ID.');
             return;
           }
 
@@ -244,6 +238,7 @@ export default function CreateScreen({ navigation }) {
             // store에 저장
             setQuestionList(listId, list);
             setCurrentListId(listId);
+            setHistoryRefresh(Date.now()); // ← 추가
 
             // UI 전환
             setIsGenerating(false);
@@ -262,7 +257,7 @@ export default function CreateScreen({ navigation }) {
             console.error('[DEBUG] 질문 리스트 GET 실패:', fetchErr.message);
             setIsGenerating(false);
             setMode('input');
-            Alert.alert('오류', '질문을 불러오는 중 문제가 발생했습니다.');
+            Alert.alert('Error', 'Failed to load questions.');
           }
         },
 
@@ -270,8 +265,8 @@ export default function CreateScreen({ navigation }) {
           console.error('[DEBUG] SSE 에러:', err.message);
           setIsGenerating(false);
           setMode('input');
-          setNavTitle('인터뷰 정보 입력 중...');
-          Alert.alert('생성 오류', err.message || '스트리밍 중 문제가 발생했습니다.');
+          setNavTitle('Generation Error', err.message);
+          Alert.alert('Generation Error', err.message || '스트리밍 중 문제가 발생했습니다.');
         },
       });
 
@@ -279,8 +274,8 @@ export default function CreateScreen({ navigation }) {
 
     } catch (err) {
       console.error('[DEBUG] handleGenerate 오류:', err.message);
-      setNavTitle('인터뷰 정보 입력 중...');
-      Alert.alert('오류', err.message || '세션 생성 중 문제가 발생했습니다.');
+      setNavTitle('Generation Error', err.message);
+      Alert.alert('Error', err.message || '세션 생성 중 문제가 발생했습니다.');
     } finally {
       setIsLoading(false);
     }
@@ -291,15 +286,15 @@ export default function CreateScreen({ navigation }) {
     <SafeAreaView style={styles.safe}>
       <View style={isDesktop ? styles.splitContainer : styles.mobileContainer}>
 
-    {/* ══ 히스토리 사이드바 ══════════════════════════════ */}
-    {isDesktop && (
-        <HistorySidebar
+        {/* ══ 히스토리 사이드바 ══════════════════════════════ */}
+        {isDesktop && (
+          <HistorySidebar
             onSelect={(listId) => {
-                setCurrentListId(listId);
-                setMode('questions');
+              setCurrentListId(listId);
+              setMode('questions');
             }}
-        />
-    )}
+          />
+        )}
         {/* ══ 왼쪽: 입력 폼 ══════════════════════════════════ */}
         {(isDesktop || mode === 'input') && (
           <View style={[
@@ -332,47 +327,47 @@ export default function CreateScreen({ navigation }) {
                 style={{ opacity: leftVisible ? 1 : 0 }}
               >
                 <View style={styles.formHeader}>
-                  <Text style={styles.formTitle}>인터뷰 준비</Text>
-                  <Text style={styles.formSub}>아래 정보를 입력하면 AI가 질문을 만들어줍니다</Text>
+                  <Text style={styles.formTitle}>Interview Prep</Text>
+                  <Text style={styles.formSub}>Enter details below and AI will generate your questions</Text>
                 </View>
 
                 {/* ① 세션 */}
-                <Field number="①" label="세션 선택">
+                <Field number="①" label="Select Session">
                   <View style={[styles.insetBox, styles.row]}>
-                    <Text style={styles.inputText}>문제 인터뷰 (세션 1)</Text>
+                    <Text style={styles.inputText}>Problem Interview (Session 1)</Text>
                     <Text style={{ color: colors.primaryEnd }}>▾</Text>
                   </View>
-                  <Text style={styles.hint}>고객이 겪는 문제의 강도와 빈도를 파악하는 세션입니다.</Text>
+                  <Text style={styles.hint}>A session to understand the severity and frequency of customer problems.</Text>
                 </Field>
 
                 {/* ② 사업 요약 */}
-                <Field number="②" label="사업/제품 요약" required>
+                <Field number="②" label="Business/Product Summary" required>
                   <TextInput
                     style={[styles.insetBox, styles.textarea]}
                     value={businessSummary}
                     onChangeText={(t) => updateSessionForm({ businessSummary: t })}
-                    placeholder='"1인 창업자를 위한 AI 기반 고객 인터뷰 자동화 서비스입니다."'
+                    placeholder='"We build an AI-powered customer interview automation service for solo founders."'
                     placeholderTextColor={colors.placeholder}
                     multiline
                     maxLength={MAX_SUMMARY}
                     textAlignVertical="top"
                   />
-                  <Text style={styles.charCount}>{businessSummary.length} / {MAX_SUMMARY}자</Text>
+                  <Text style={styles.charCount}>{businessSummary.length} / {MAX_SUMMARY}chars</Text>
                 </Field>
 
                 {/* ③ 타겟 고객 */}
-                <Field number="③" label="타겟 고객" optional>
+                <Field number="③" label="Target Customer" optional>
                   <TextInput
                     style={[styles.insetBox, styles.singleInput]}
                     value={persona}
                     onChangeText={(t) => updateSessionForm({ persona: t })}
-                    placeholder='"사이드 프로젝트 중인 개발자, 30대 초반"'
+                    placeholder='"Solo developer working on a side project, early 30s"'
                     placeholderTextColor={colors.placeholder}
                   />
                 </Field>
 
                 {/* ④ 스타일 */}
-                <Field number="④" label="질문 스타일">
+                <Field number="④" label="Question Style">
                   <View style={styles.tabRow}>
                     {STYLE_OPTIONS.map((opt) => {
                       const active = style === opt;
@@ -404,12 +399,12 @@ export default function CreateScreen({ navigation }) {
                 </Field>
 
                 {/* ⑤ 추가 지시 */}
-                <Field number="⑤" label="추가 지시사항" optional>
+                <Field number="⑤" label="Additional Instructions" optional>
                   <TextInput
                     style={[styles.insetBox, styles.textarea, { minHeight: 56 }]}
                     value={extraInstr}
                     onChangeText={setExtraInstr}
-                    placeholder='"SaaS B2B 맥락, 예산 결정권자 대상으로"'
+                    placeholder='"SaaS B2B context, targeting budget decision makers"'
                     placeholderTextColor={colors.placeholder}
                     multiline
                     textAlignVertical="top"
@@ -418,7 +413,7 @@ export default function CreateScreen({ navigation }) {
 
                 {/* CTA */}
                 <GradientButton
-                  label={isLoading ? '세션 생성 중...' : '✦ 질문 생성하기'}
+                  label={isLoading ? 'Creating...' : mode === 'questions' ? '✦ Regenerate' : '✦ Generate Questions'}
                   onPress={handleGenerate}
                   disabled={!canSubmit || isLoading || isGenerating}
                   loading={isLoading}
@@ -437,9 +432,9 @@ export default function CreateScreen({ navigation }) {
             {mode === 'input' && (
               <View style={styles.rightEmpty}>
                 <Text style={styles.emptyIcon}>✦</Text>
-                <Text style={styles.emptyTitle}>왼쪽에서 입력하고 생성 버튼을 누르세요</Text>
+                <Text style={styles.emptyTitle}>Enter details on the left and click Generate</Text>
                 <Text style={styles.emptyDesc}>
-                  AI가 린 고객개발 프레임워크에 맞춰{'\n'}인터뷰 질문을 실시간으로 작성합니다
+                  AI will generate interview questions{'\n'}based on the Lean Customer Development framework
                 </Text>
               </View>
             )}
@@ -455,8 +450,8 @@ export default function CreateScreen({ navigation }) {
                 ref={rightScrollRef}
                 contentContainerStyle={styles.rightScroll}
               >
-                <Text style={styles.genTitle}>질문 생성 중</Text>
-                <Text style={styles.genSub}>린 고객개발 프레임워크 기반으로 작성하고 있어요</Text>
+                <Text style={styles.genTitle}>Generating Questions</Text>
+                <Text style={styles.genSub}>Writing based on Lean Customer Development framework</Text>
 
                 {/* 생성된 카드들 */}
                 {generatedItems.map((item, idx) => (
@@ -476,12 +471,12 @@ export default function CreateScreen({ navigation }) {
                   onPress={() => {
                     cancelStream();
                     setMode('input');
-                    setNavTitle('인터뷰 정보 입력 중...');
+                    setNavTitle('Preparing interview...');
                   }}
                   style={{ alignItems: 'center', marginTop: spacing.sm }}
                 >
                   <Text style={{ fontSize: 14, color: colors.textDisabled, textDecorationLine: 'underline' }}>
-                    취소하고 처음으로
+                    Cancel and start over
                   </Text>
                 </TouchableOpacity>
               </ScrollView>
@@ -500,8 +495,8 @@ function Field({ number, label, required, optional, children }) {
       <View style={styles.labelRow}>
         <Text style={styles.labelNum}>{number}</Text>
         <Text style={styles.labelText}>{label}</Text>
-        {required && <Text style={styles.badge}>(필수)</Text>}
-        {optional && <Text style={styles.badge}>(선택)</Text>}
+        {required && <Text style={styles.badge}>(required)</Text>}
+        {optional && <Text style={styles.badge}>(optional)</Text>}
       </View>
       {children}
     </View>

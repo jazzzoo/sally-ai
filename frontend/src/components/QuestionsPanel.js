@@ -20,7 +20,8 @@ import { colors, spacing, radius, textStyles, shadows } from '../theme';
 import { Copy, Share2 } from 'lucide-react-native';
 
 export default function QuestionsPanel({ scrollRef, style }) {
-  const { questionListCache, currentListId, generatedItems, updateQuestion, toggleHidden, setQuestionList } = useStore();
+  const { questionListCache, currentListId, generatedItems, updateQuestion, toggleHidden, setQuestionList, sessionForm } = useStore();
+  const { businessSummary } = sessionForm;
 
   const listId = currentListId;
   const cached = questionListCache[listId];
@@ -42,10 +43,10 @@ export default function QuestionsPanel({ scrollRef, style }) {
       await questionListsApi.regenerateAll(listId, {
         additional_instruction: regenInput.trim() || undefined,
       });
-      Alert.alert('재생성 완료', '질문이 새로 생성되었습니다.');
+      Alert.alert('Regenerated', 'Questions have been regenerated.');
       setRegenInput('');
     } catch (err) {
-      Alert.alert('오류', err.message);
+      Alert.alert('error', err.message);
     } finally {
       setIsRegening(false);
     }
@@ -62,7 +63,7 @@ export default function QuestionsPanel({ scrollRef, style }) {
       )
       .join('\n\n');
     Clipboard.setString(txt);
-    Alert.alert('복사 완료', '클립보드에 복사되었습니다.');
+    Alert.alert('Copied', 'opied to clipboard.');
   }
 
   async function handleExport() {
@@ -92,9 +93,11 @@ export default function QuestionsPanel({ scrollRef, style }) {
         {/* 헤더 */}
         <View style={styles.header}>
           <View>
-            <Text style={styles.title}>세션 1 질문 리스트</Text>
+            <Text style={styles.title}>
+              {cached?.title || businessSummary || 'Session 1'}
+            </Text>
             <Text style={styles.meta}>
-              질문 {questionCount}개 + 리액션 {reactionCount}개 · 방금 전
+              {questionCount} Questions + {reactionCount} Reactions
             </Text>
           </View>
           <View style={styles.headerBtns}>
@@ -114,11 +117,11 @@ export default function QuestionsPanel({ scrollRef, style }) {
             style={styles.regenInput}
             value={regenInput}
             onChangeText={setRegenInput}
-            placeholder='"더 깊은 질문으로 다시 만들어줘..."'
+            placeholder='"Make the questions deeper..."'
             placeholderTextColor={colors.placeholder}
           />
           <GradientButton
-            label={isRegening ? '...' : '재생성'}
+            label={isRegening ? '...' : 'Regenerate'}
             onPress={handleRegenAll}
             loading={isRegening}
             small
@@ -187,7 +190,7 @@ export default function QuestionsPanel({ scrollRef, style }) {
 
         {/* 하단 내보내기 (패널 모드에서는 scroll 내부에) */}
         <GradientButton
-          label="질문 완성 → 내보내기"
+          label="Finalize → Export"
           onPress={handleExport}
           style={{ marginTop: spacing.md }}
         />

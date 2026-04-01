@@ -31,13 +31,13 @@ export default function EditPanel({ item, listId, onUpdate }) {
     : isReaction ? colors.primary
       : colors.primaryEnd;
 
-  const label = isIce ? '✦ 아이스브레이킹 편집'
-    : isReaction ? '◇ 리액션 멘트 편집'
-      : `Q${item.number} 편집`;
+  const label = isIce ? '✦ Edit Icebreaker'
+    : isReaction ? '◇ Edit Reaction'
+      : `Edit Q${item.number}`;
 
-  const aiPlaceholder = isIce ? '"더 따뜻한 느낌으로, 가볍게 시작해서"'
-    : isReaction ? '"더 공감 표현 강하게"'
-      : '"더 부드럽게, 공감 표현 추가해서"';
+  const aiPlaceholder = isIce ? '"Make it warmer, start lightly..."'
+    : isReaction ? '"Express more empathy..."'
+      : '"Make it softer, add empathy..."';
 
   const [isEditing, setIsEditing] = useState(false);
   const [editText, setEditText] = useState(item.text);
@@ -62,7 +62,7 @@ export default function EditPanel({ item, listId, onUpdate }) {
       setAiInstruction('');
       setRevisionReason(res.question?.revision_reason || '');
     } catch (err) {
-      Alert.alert('수정 오류', err.message);
+      Alert.alert('Edit Error', err.message);
     } finally {
       setIsAiLoading(false);
     }
@@ -84,7 +84,7 @@ export default function EditPanel({ item, listId, onUpdate }) {
       <View style={styles.panelBody}>
         {/* 현재 텍스트 (아이스브레이커 / 리액션만) */}
         {(isIce || isReaction) && (
-          <Section label="현재 텍스트">
+          <Section label="Current Text">
             <View style={styles.insetBox}>
               {isEditing ? (
                 <>
@@ -99,7 +99,7 @@ export default function EditPanel({ item, listId, onUpdate }) {
                     onPress={() => { onUpdate?.({ text: editText }); setIsEditing(false); }}
                     style={{ marginTop: 6, alignItems: 'flex-end' }}
                   >
-                    <Text style={{ fontSize: 14, color: colors.primaryEnd, fontWeight: '600' }}>저장</Text>
+                    <Text style={{ fontSize: 14, color: colors.primaryEnd, fontWeight: '600' }}>Save</Text>
                   </TouchableOpacity>
                 </>
               ) : (
@@ -113,7 +113,7 @@ export default function EditPanel({ item, listId, onUpdate }) {
 
         {/* 질문 텍스트 직접 수정 (일반 질문만) */}
         {!isIce && !isReaction && isEditing && (
-          <Section label="현재 텍스트">
+          <Section label="Current Text">
             <View style={styles.insetBox}>
               <TextInput
                 style={[styles.currentText, { minHeight: 60 }]}
@@ -126,7 +126,7 @@ export default function EditPanel({ item, listId, onUpdate }) {
                 onPress={() => { onUpdate?.({ text: editText }); setIsEditing(false); }}
                 style={{ marginTop: 6, alignItems: 'flex-end' }}
               >
-                <Text style={{ fontSize: 14, color: colors.primaryMid, fontWeight: '600' }}>저장</Text>
+                <Text style={{ fontSize: 14, color: colors.primaryMid, fontWeight: '600' }}>Save</Text>
               </TouchableOpacity>
             </View>
           </Section>
@@ -134,9 +134,9 @@ export default function EditPanel({ item, listId, onUpdate }) {
 
         {/* 왜 이 질문? (일반 질문만) */}
         {!isIce && !isReaction && item.why && (
-          <Section label="왜 이 질문인가?">
+          <Section label="Why This Question?">
             <View style={styles.whyBox}>
-              <Text style={styles.whyLabel}>왜? </Text>
+              <Text style={styles.whyLabel}>Why? </Text>
               <Text style={styles.whyText}>{item.why}</Text>
             </View>
           </Section>
@@ -144,7 +144,7 @@ export default function EditPanel({ item, listId, onUpdate }) {
 
         {/* 후속 질문 (일반 질문만) */}
         {!isIce && !isReaction && item.follow_up?.length > 0 && (
-          <Section label="후속 질문 추천">
+          <Section label="Follow-up Suggestions">
             {item.follow_up.map((fq, i) => (
               <View key={i} style={styles.followUpItem}>
                 <Text style={styles.followUpText}>
@@ -159,14 +159,14 @@ export default function EditPanel({ item, listId, onUpdate }) {
         {isReaction && (
           <View style={styles.reactionHint}>
             <Text style={styles.reactionHintText}>
-              💡 이전 답변 후 다음 질문으로 자연스럽게 넘어가는 공감·전환 멘트예요.
+              💡 A transition phrase to naturally move to the next question.
             </Text>
           </View>
         )}
 
         {/* AI 수정 이유 */}
         {revisionReason ? (
-          <Section label="AI 수정 이유">
+          <Section label="AI Revision Reason">
             <View style={styles.whyBox}>
               <Text style={styles.whyLabel}>✦ </Text>
               <Text style={styles.whyText}>{revisionReason}</Text>
@@ -175,7 +175,7 @@ export default function EditPanel({ item, listId, onUpdate }) {
         ) : null}
 
         {/* AI 수정 지시 */}
-        <Section label="AI 수정 지시">
+        <Section label="AI Edit Instructions">
           <TextInput
             style={[styles.insetBox, styles.aiInput]}
             value={aiInstruction}
@@ -189,7 +189,7 @@ export default function EditPanel({ item, listId, onUpdate }) {
         {/* 버튼 행 */}
         <View style={styles.btnRow}>
           <GradientButton
-            label={isAiLoading ? '수정 중...' : '✦ AI로 수정'}
+            label={isAiLoading ? 'Editing...' : '✦ Edit with AI'}
             onPress={handleAiEdit}
             loading={isAiLoading}
             disabled={!aiInstruction.trim()}

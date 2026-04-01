@@ -18,12 +18,12 @@ import { colors, gradientColors, spacing, radius, textStyles } from '../theme';
 
 // ── 무한 스크롤 텍스트 6개 ─────────────────────────────────────
 const HINTS = [
-  'AI가 질문 10~15개를 자동 생성해요',
-  "'왜 이 질문인가?' 코멘트도 함께 제공돼요",
-  '린 고객개발 4세션 프레임워크를 따릅니다',
-  '후속 질문 가이드도 자동으로 만들어줘요',
-  '계정 없이 바로 시작할 수 있어요',
-  '생성된 질문은 언제든지 수정 가능해요',
+  'AI auto-generates 10–15 interview questions',
+  "'Why this question?' comments included",
+  'Follows the Lean Customer Dev 4-session framework',
+  'Follow-up question guides generated automatically',
+  'No account needed — start instantly',
+  'Generated questions can be edited anytime',
 ];
 
 const ITEM_HEIGHT = 38;  // 한 줄 높이 (px)
@@ -155,32 +155,31 @@ export default function IntroScreen({ navigation }) {
 
           {/* 헤드라인 */}
           <Text style={styles.headline}>
-            린 고객개발 인터뷰를{'\n'}
-            <Text style={styles.headlineAccent}>10분 안에 준비하세요</Text>
+           Prepare your Lean Customer{'\n'}
+            <Text style={styles.headlineAccent}>Development Interview in 10 min</Text>
           </Text>
 
           {/* 서브 카피 */}
           <Text style={styles.subCopy}>
-            AI가 린 고객개발 4세션 프레임워크에 맞춰{'\n'}
-            인터뷰 질문을 자동 생성합니다.
+            AI generates interview questions{'\n'}based on the Lean Customer Development framework.
           </Text>
 
           {/* ── 프롬프트 박스 + 무한 스크롤 텍스트 ── */}
           <View style={styles.promptBox}>
             <View style={styles.promptHeader}>
               <View style={styles.promptDot} />
-              <Text style={styles.promptLabel}>Sally가 도와드릴 수 있어요</Text>
+              <Text style={styles.promptLabel}>Sally can help you with</Text>
             </View>
             <MarqueeText />
           </View>
 
           {/* CTA */}
           <GradientButton
-            label="✦ 지금 시작하기 →"
+            label="✦ Get Started →"
             onPress={() => navigation.navigate('Create')}
             style={styles.ctaWrapper}
           />
-          <Text style={styles.noAccount}>계정 불필요 · 무료로 시작</Text>
+          <Text style={styles.noAccount}>No account needed · Free to start</Text>
 
         </View>
       </View>

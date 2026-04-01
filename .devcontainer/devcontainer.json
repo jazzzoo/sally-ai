@@ -13,5 +13,5 @@
       "visibility": "public"
     }
   },
-  "postStartCommand": "cd /workspaces/sally-ai && npm run dev"
+  "postStartCommand": ""
 }

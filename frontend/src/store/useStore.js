@@ -116,6 +116,19 @@ const useStore = create(
           };
         }),
       setCurrentListId: (id) => set({ currentListId: id }),
+      historyRefresh: 0,
+      setHistoryRefresh: (t) => set({ historyRefresh: t }),
+      updateListTitle: (listId, title) =>
+        set((state) => {
+          const list = state.questionListCache[listId];
+          if (!list) return {};
+          return {
+            questionListCache: {
+              ...state.questionListCache,
+              [listId]: { ...list, title },
+            },
+          };
+        }),
     }),
 
     {
