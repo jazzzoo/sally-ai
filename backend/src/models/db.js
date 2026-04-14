@@ -34,13 +34,20 @@ export const query = (text, params) => pool.query(text, params);
 //     return client.query('SELECT * FROM projects');
 //   });
 // ─────────────────────────────────────────
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export const withRLS = async (guestId, callback) => {
+  if (!UUID_REGEX.test(guestId)) {
+    throw new Error(`Invalid guestId format: ${guestId}`);
+  }
+
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
 
     // PostgreSQL 세션 변수 설정 — RLS 정책이 이 값을 참조
     // PRD: current_setting('app.current_guest_id')::uuid
+    // SET LOCAL은 $1 파라미터 미지원 → UUID 형식 검증으로 injection 방어
     await client.query(
       `SET LOCAL app.current_guest_id = '${guestId}'`
     );

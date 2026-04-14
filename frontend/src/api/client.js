@@ -199,6 +199,38 @@ export const questionListsApi = {
   delete: (listId) => apiDelete(`/api/question-lists/${listId}`),
 };
 
+// 인터뷰 세션 (창업자용 - 인증 필요)
+export const interviewSessionsApi = {
+  create: (question_list_id) => apiPost('/api/interview-sessions', { question_list_id }),
+  list: (question_list_id) =>
+    apiGet(`/api/interview-sessions${question_list_id ? `?question_list_id=${question_list_id}` : ''}`),
+  deactivate: (id) => apiDelete(`/api/interview-sessions/${id}`),
+};
+
+// 인터뷰 채팅 (응답자용 - 인증 없음, token 기반)
+export const interviewApi = {
+  getSession: async (token) => {
+    const res = await fetch(`${BASE_URL}/api/interview/${token}`);
+    return parseResponse(res);
+  },
+  start: async (token, name) => {
+    const res = await fetch(`${BASE_URL}/api/interview/${token}/start`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name }),
+    });
+    return parseResponse(res);
+  },
+  chat: async (token, content) => {
+    const res = await fetch(`${BASE_URL}/api/interview/${token}/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content }),
+    });
+    return parseResponse(res);
+  },
+};
+
 // 헬스체크
 export const healthApi = {
   check: () => apiGet('/health'),

@@ -4,6 +4,8 @@ import cors from 'cors';
 import { checkConnection } from './models/db.js';
 import sessionsRouter from './routes/sessions.js';
 import questionListsRouter from './routes/questionLists.js';
+import interviewSessionsRouter from './routes/interviewSessions.js';
+import interviewRouter from './routes/interview.js';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import rateLimit from 'express-rate-limit';
@@ -71,6 +73,8 @@ app.use((req, res, next) => {
 // ─────────────────────────────────────────
 app.use('/api/sessions', sessionsRouter);
 app.use('/api/question-lists', questionListsRouter);
+app.use('/api/interview-sessions', interviewSessionsRouter); // 창업자용 링크 관리
+app.use('/api/interview', interviewRouter);                  // 응답자용 공개 채팅
 
 // ─────────────────────────────────────────
 // 헬스체크
@@ -132,6 +136,11 @@ app.listen(PORT, async () => {
   console.log('  GET  /api/sessions/:id');
   console.log('  GET  /api/sessions/:id/generate-stream  ← SSE');
   console.log('  GET  /api/question-lists/:id');
+  console.log('  POST /api/interview-sessions             ← 링크 생성');
+  console.log('  GET  /api/interview-sessions             ← 링크 목록');
+  console.log('  GET  /api/interview/:token               ← 공개 세션 조회');
+  console.log('  POST /api/interview/:token/start         ← 이름 등록 + 첫 인사');
+  console.log('  POST /api/interview/:token/chat          ← 채팅 턴');
 });
 
 export default app;

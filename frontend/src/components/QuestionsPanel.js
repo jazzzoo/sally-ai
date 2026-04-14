@@ -16,9 +16,9 @@ import EditPanel from './EditPanel';
 import GradientButton from './GradientButton';
 import ModalDialog from './ModalDialog';
 import useStore from '../store/useStore';
-import { questionListsApi } from '../api/client';
+import { questionListsApi, interviewSessionsApi } from '../api/client';
 import { colors, spacing, radius, textStyles, shadows } from '../theme';
-import { Copy, Share2 } from 'lucide-react-native';
+import { Copy, Share2, Link } from 'lucide-react-native';
 
 export default function QuestionsPanel({ scrollRef, style }) {
   const { questionListCache, currentListId, generatedItems, updateQuestion, toggleHidden, setQuestionList, sessionForm } = useStore();
@@ -32,6 +32,9 @@ export default function QuestionsPanel({ scrollRef, style }) {
   const [regenInput, setRegenInput] = useState('');
   const [isRegening, setIsRegening] = useState(false);
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [shareLink, setShareLink] = useState('');
+  const [isCreatingLink, setIsCreatingLink] = useState(false);
 
   const toggle = useCallback(
     (id) => setExpanded((prev) => (prev === id ? null : id)),
@@ -85,6 +88,27 @@ export default function QuestionsPanel({ scrollRef, style }) {
     await Share.share({ message: md });
   }
 
+  async function handleCreateShareLink() {
+    if (!listId) return;
+    setIsCreatingLink(true);
+    try {
+      const res = await interviewSessionsApi.create(listId);
+      setShareLink(res.data.url);
+      setShowShareModal(true);
+    } catch (err) {
+      Alert.alert('Error', err.message || 'Failed to create interview link.');
+    } finally {
+      setIsCreatingLink(false);
+    }
+  }
+
+  function handleCopyShareLink() {
+    if (shareLink) {
+      Clipboard.setString(shareLink);
+      Alert.alert('Copied!', 'Interview link copied to clipboard.');
+    }
+  }
+
   const questionCount = items.filter((i) => i.type === 'question' && !i.hidden).length;
   const reactionCount = items.filter((i) => i.type === 'reaction').length;
 
@@ -107,12 +131,19 @@ export default function QuestionsPanel({ scrollRef, style }) {
             </Text>
           </View>
           <View style={styles.headerBtns}>
-
             <TouchableOpacity style={styles.iconBtn} onPress={handleCopy} title="클립보드에 복사">
               <Copy size={20} color={colors.textSecondary} />
             </TouchableOpacity>
             <TouchableOpacity style={styles.iconBtn} onPress={handleExportPress} title="공유하기">
               <Share2 size={20} color={colors.textSecondary} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.iconBtn, styles.linkBtn]}
+              onPress={handleCreateShareLink}
+              disabled={isCreatingLink}
+              title="인터뷰 링크 생성"
+            >
+              <Link size={18} color={colors.white} />
             </TouchableOpacity>
           </View>
         </View>
@@ -201,6 +232,25 @@ export default function QuestionsPanel({ scrollRef, style }) {
           style={{ marginTop: spacing.md }}
         />
       </Pressable>
+
+      {/* 인터뷰 링크 공유 모달 */}
+      <ModalDialog
+        visible={showShareModal}
+        title="Interview Link Created"
+        message={[
+          'Share this link with your interviewee.',
+          shareLink,
+        ]}
+        mode="confirm"
+        confirmLabel="Copy Link"
+        cancelLabel="Close"
+        confirmColor={colors.primary}
+        onConfirm={() => {
+          handleCopyShareLink();
+          setShowShareModal(false);
+        }}
+        onCancel={() => setShowShareModal(false)}
+      />
 
       <ModalDialog
         visible={showFeedbackModal}
@@ -339,6 +389,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     ...shadows.card,
+  },
+  linkBtn: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
   },
   iconBtnText: { fontSize: 17, color: colors.textSecondary },
 

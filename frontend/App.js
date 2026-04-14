@@ -15,6 +15,7 @@ import { colors }      from './src/theme';
 import IntroScreen     from './src/screens/IntroScreen';
 import CreateScreen    from './src/screens/CreateScreen';
 import QuestionsScreen from './src/screens/QuestionsScreen';
+import InterviewScreen from './src/screens/InterviewScreen';
 // GenerateScreen 제거 — CreateScreen에 통합됨
 
 const Stack = createNativeStackNavigator();
@@ -27,9 +28,13 @@ const linking = {
       Intro:     '',
       Create:    'create',
       Questions: 'questions',
+      Interview: 'interview/:token',
     },
   },
 };
+
+// NavBar를 숨길 라우트
+const HIDDEN_NAVBAR_ROUTES = new Set(['Interview']);
 
 // 웹 스크롤바 커스텀 CSS 주입
 if (typeof document !== 'undefined') {
@@ -70,6 +75,7 @@ export default function App() {
   const navRef   = useNavigationContainerRef();
   const { width } = useWindowDimensions();
   const isDesktop = width >= 640;
+  const [currentRoute, setCurrentRoute] = React.useState('Intro');
 
   useEffect(() => { initAuth(); }, []);
 
@@ -79,16 +85,25 @@ export default function App() {
     }
   }
 
+  const showNavBar = !HIDDEN_NAVBAR_ROUTES.has(currentRoute);
+
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
         <StatusBar style="dark" backgroundColor={colors.background} />
         <View style={{ flex: 1, backgroundColor: colors.background }}>
 
-          {/* NavBar — 항상 표시 (로고 CTA + 동적 타이틀) */}
-          <NavBar onLogoPress={handleLogoPress} />
+          {/* NavBar — Interview 화면 제외하고 표시 */}
+          {showNavBar && <NavBar onLogoPress={handleLogoPress} />}
 
-          <NavigationContainer ref={navRef} linking={linking}>
+          <NavigationContainer
+            ref={navRef}
+            linking={linking}
+            onStateChange={(state) => {
+              const route = state?.routes?.[state.index];
+              if (route?.name) setCurrentRoute(route.name);
+            }}
+          >
             <Stack.Navigator
               initialRouteName="Intro"
               screenOptions={{
@@ -100,6 +115,7 @@ export default function App() {
               <Stack.Screen name="Intro"     component={IntroScreen} />
               <Stack.Screen name="Create"    component={CreateScreen} />
               <Stack.Screen name="Questions" component={QuestionsScreen} />
+              <Stack.Screen name="Interview" component={InterviewScreen} />
             </Stack.Navigator>
           </NavigationContainer>
 
