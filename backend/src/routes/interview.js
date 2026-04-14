@@ -14,18 +14,50 @@ import pool, { query } from '../models/db.js';
 const router = Router();
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
-// ── Rate Limit (토큰 기반, 간단 메모리) ──────────────────────────
-const chatLimitMap = new Map(); // key: token_date → count
+// ─────────────────────────────────────────────────────────────────
+// 섹션 설정
+// ─────────────────────────────────────────────────────────────────
+const SECTION_ORDER = ['icebreaker', 'context', 'problems', 'alternatives', 'wtp'];
+
+const SECTION_CONFIG = {
+  icebreaker:   { minTurns: 2, maxFollowups: 0 },
+  context:      { minTurns: 2, maxFollowups: 1 },
+  problems:     { minTurns: 3, maxFollowups: 2 },
+  alternatives: { minTurns: 2, maxFollowups: 1 },
+  wtp:          { minTurns: 2, maxFollowups: 2 },
+};
+
+const SECTION_GOALS = {
+  icebreaker:
+    "Build rapport. Learn about the respondent's role, background, and how they relate to the problem space. Keep it light and conversational.",
+  context:
+    'Understand their current situation and workflow around the problem. Learn what they do today, how often, and with what tools or processes.',
+  problems:
+    'Identify their biggest pain points in detail. Probe for specifics: what exactly fails, how often it happens, and what the cost or impact is.',
+  alternatives:
+    "Understand what solutions they currently use or have tried. What do they like? What frustrates them most about current alternatives?",
+  wtp:
+    "Explore whether they would pay for a better solution. What would need to be true? What budget range feels right? Do NOT anchor with a price — let them speak first.",
+  wrap_up:
+    'Wrap up the interview warmly. Thank them sincerely. You may close with one open question: "Is there anything else you\'d like to share that we haven\'t covered?"',
+};
+
+// ─────────────────────────────────────────────────────────────────
+// Rate limit (토큰 기반, 메모리)
+// ─────────────────────────────────────────────────────────────────
+const chatLimitMap = new Map();
 const checkChatLimit = (token) => {
   const today = new Date().toISOString().slice(0, 10);
   const key = `${token}_${today}`;
   const count = chatLimitMap.get(key) || 0;
-  if (count >= 100) return false; // 토큰당 100회/일
+  if (count >= 100) return false;
   chatLimitMap.set(key, count + 1);
   return true;
 };
 
-// ── 세션 + 질문 리스트 로드 헬퍼 ─────────────────────────────────
+// ─────────────────────────────────────────────────────────────────
+// DB 헬퍼
+// ─────────────────────────────────────────────────────────────────
 async function loadSession(token) {
   const result = await query(
     `SELECT
@@ -52,8 +84,8 @@ async function loadSession(token) {
   return result.rows[0] || null;
 }
 
-// ── 대화 조회 헬퍼 (turn_index 순 정렬) ──────────────────────────
-async function loadRecentTurns(interviewSessionId, limit = 8) {
+// 전체 대화 (디스플레이용, ASC)
+async function loadAllTurns(interviewSessionId, limit = 50) {
   const result = await query(
     `SELECT role, content, section, question_index, turn_index, created_at
      FROM interview_turns
@@ -65,7 +97,23 @@ async function loadRecentTurns(interviewSessionId, limit = 8) {
   return result.rows;
 }
 
-// ── 인터뷰 상태 조회/생성 헬퍼 ───────────────────────────────────
+// 최근 N턴 (Claude context용, ASC 정렬 반환)
+async function loadRecentTurnsForContext(interviewSessionId, limit = 6) {
+  const result = await query(
+    `SELECT role, content, section, turn_index
+     FROM (
+       SELECT role, content, section, turn_index
+       FROM interview_turns
+       WHERE interview_session_id = $1
+       ORDER BY turn_index DESC
+       LIMIT $2
+     ) t
+     ORDER BY turn_index ASC`,
+    [interviewSessionId, limit]
+  );
+  return result.rows;
+}
+
 async function getOrCreateState(interviewSessionId) {
   const existing = await query(
     `SELECT * FROM interview_state WHERE interview_session_id = $1`,
@@ -74,166 +122,284 @@ async function getOrCreateState(interviewSessionId) {
   if (existing.rows.length > 0) return existing.rows[0];
 
   const created = await query(
-    `INSERT INTO interview_state (interview_session_id)
-     VALUES ($1)
-     RETURNING *`,
+    `INSERT INTO interview_state (interview_session_id) VALUES ($1) RETURNING *`,
     [interviewSessionId]
   );
   return created.rows[0];
 }
 
-// ── 다음 질문 결정 ────────────────────────────────────────────────
-function resolveNextQuestion(state, questionList) {
-  const icebreakers = questionList.icebreakers || [];
-  const questions = questionList.questions || [];
+// 섹션 완료 요약: 해당 섹션의 최근 user 답변 2개를 key_points로 저장
+async function buildSectionSummary(interviewSessionId, section) {
+  const result = await query(
+    `SELECT content FROM interview_turns
+     WHERE interview_session_id = $1 AND role = 'user' AND section = $2
+     ORDER BY turn_index DESC
+     LIMIT 2`,
+    [interviewSessionId, section]
+  );
+  const keyPoints = result.rows.reverse().map((r) =>
+    r.content.length > 150 ? r.content.substring(0, 150) + '…' : r.content
+  );
+  return { section, key_points: keyPoints };
+}
 
-  if (state.current_section === 'icebreaker') {
-    if (state.question_index < icebreakers.length) {
-      return {
-        section: 'icebreaker',
-        question_index: state.question_index,
-        text: icebreakers[state.question_index].text,
-        isLast: false,
-      };
+// ─────────────────────────────────────────────────────────────────
+// 프롬프트 조립
+// ─────────────────────────────────────────────────────────────────
+function buildSystemPrompt({ section, businessContext, keyTopics, completedSections, followupCount, maxFollowups }) {
+  const prevText =
+    completedSections.length > 0
+      ? completedSections
+          .map((s) => `[${s.section.toUpperCase()}]\n${s.key_points.map((p) => `  - ${p}`).join('\n')}`)
+          .join('\n\n')
+      : 'No previous sections completed yet.';
+
+  const topicsText =
+    keyTopics.length > 0
+      ? keyTopics.map((q, i) => `  ${i + 1}. ${q.text || String(q)}`).join('\n')
+      : '  (No specific topics — use your judgment based on the business context.)';
+
+  return `[ROLE]
+You are Sally, an expert customer development interviewer working on behalf of a non-native English founder.
+The respondent is a potential customer. Listen carefully and ask one thoughtful question at a time.
+
+[BUSINESS CONTEXT]
+${businessContext}
+
+[KEY TOPICS TO COVER — use as guidance, not a rigid script]
+${topicsText}
+
+[CURRENT SECTION: ${section.toUpperCase()}]
+Goal: ${SECTION_GOALS[section] || ''}
+
+[RULES]
+- Ask exactly ONE question per response
+- Use natural, simple conversational English
+- Never mention section names, interview structure, or transitions to the respondent
+- Never ask about pricing until the wtp section
+- Do not repeat topics already covered in previous sections
+- Briefly acknowledge the respondent's last answer before your question (1 short sentence max)
+- Avoid hollow affirmations: no "Great!", "Interesting!", "Awesome!" — use genuine acknowledgment or nothing
+- If this is a follow-up, dig deeper into what they just said; do not change topic
+
+[PREVIOUS SECTIONS — KEY FINDINGS]
+${prevText}
+
+[CURRENT STATE]
+Follow-ups used on current question: ${followupCount}/${maxFollowups}
+
+[OUTPUT — RESPOND WITH JSON ONLY, NO OTHER TEXT]
+{
+  "next_question": "The exact English question to send to the respondent",
+  "needs_followup": false,
+  "followup_reason": "",
+  "section_complete_candidate": false,
+  "section_completion_reason": ""
+}`;
+}
+
+// ─────────────────────────────────────────────────────────────────
+// Claude API 호출 + JSON 파싱 (최대 1회 재시도)
+// ─────────────────────────────────────────────────────────────────
+async function callClaudeForTurn(systemPrompt, recentTurns, retryCount = 0) {
+  // Claude messages 배열: user 턴으로 시작해야 함
+  let messages = recentTurns.map((t) => ({ role: t.role, content: t.content }));
+  while (messages.length > 0 && messages[0].role === 'assistant') {
+    messages = messages.slice(1);
+  }
+  if (messages.length === 0) {
+    messages = [{ role: 'user', content: 'Please begin.' }];
+  }
+
+  try {
+    const response = await anthropic.messages.create({
+      model: process.env.AI_PRIMARY_MODEL || 'claude-haiku-4-5-20251001',
+      max_tokens: parseInt(process.env.AI_MAX_TOKENS_INTERVIEW) || 700,
+      system: systemPrompt,
+      messages,
+    });
+
+    const rawText = response.content[0].text;
+    const cleaned = rawText
+      .replace(/^```json\s*/i, '')
+      .replace(/^```\s*/i, '')
+      .replace(/\s*```$/i, '')
+      .trim();
+
+    const parsed = JSON.parse(cleaned);
+    if (!parsed.next_question || typeof parsed.next_question !== 'string') {
+      throw new Error('Invalid JSON: missing next_question');
     }
+
     return {
-      section: 'main',
-      question_index: 0,
-      text: questions[0]?.text || null,
-      isLast: questions.length <= 1,
+      next_question:             parsed.next_question.trim(),
+      needs_followup:            Boolean(parsed.needs_followup),
+      followup_reason:           String(parsed.followup_reason || ''),
+      section_complete_candidate: Boolean(parsed.section_complete_candidate),
+      section_completion_reason: String(parsed.section_completion_reason || ''),
+    };
+  } catch (err) {
+    if (retryCount < 1) {
+      console.warn('[Interview] Claude JSON parse failed, retrying:', err.message);
+      return callClaudeForTurn(systemPrompt, recentTurns, retryCount + 1);
+    }
+    console.error('[Interview] Claude failed after retry:', err.message);
+    return {
+      next_question:             'Could you tell me a bit more about that?',
+      needs_followup:            true,
+      followup_reason:           'api_error',
+      section_complete_candidate: false,
+      section_completion_reason: '',
     };
   }
-
-  if (state.current_section === 'main') {
-    if (state.question_index < questions.length) {
-      return {
-        section: 'main',
-        question_index: state.question_index,
-        text: questions[state.question_index].text,
-        isLast: state.question_index >= questions.length - 1,
-      };
-    }
-    return { section: 'completed', question_index: 0, text: null, isLast: true };
-  }
-
-  return { section: 'completed', question_index: 0, text: null, isLast: true };
 }
 
-// ── 상태 업데이트 (트랜잭션 내부용) ──────────────────────────────
-async function advanceState(dbClient, interviewSessionId, current, questionList, userTurnId, assistantTurnId) {
-  const icebreakers = questionList.icebreakers || [];
-  const questions = questionList.questions || [];
+// ─────────────────────────────────────────────────────────────────
+// 서버 의사결정 (Claude 힌트 참조하되 서버가 최종 결정)
+// ─────────────────────────────────────────────────────────────────
+function makeServerDecision(state, claudeResult, wordCount) {
+  const section = state.current_section;
+  const config = SECTION_CONFIG[section];
 
-  let next_section = current.current_section;
-  let next_index = current.question_index + 1;
-  let transition_reason = 'answered';
+  if (!config) return { action: 'wrap_up' };
 
-  if (current.current_section === 'icebreaker') {
-    if (next_index >= icebreakers.length) {
-      next_section = 'main';
-      next_index = 0;
-    }
-  } else if (current.current_section === 'main') {
-    if (next_index >= questions.length) {
-      next_section = 'completed';
-      next_index = 0;
-      transition_reason = 'all_questions_answered';
-    }
+  // 이번 턴 포함한 섹션 내 누적 user 턴 수
+  const candidateTurnCount = (state.section_turn_count || 0) + 1;
+  const forceFollowup = wordCount < 15;
+  const canFollowup = (state.followup_count || 0) < config.maxFollowups;
+
+  // 1순위: followup (짧은 답변 강제 or Claude 판단)
+  if ((forceFollowup || claudeResult.needs_followup) && canFollowup) {
+    return { action: 'followup' };
   }
 
-  const current_question_key = next_section !== 'completed'
-    ? `${next_section}_${next_index}`
-    : null;
+  // 2순위: 섹션 전환 (min_turns 충족 + Claude 완료 신호)
+  if (candidateTurnCount >= config.minTurns && claudeResult.section_complete_candidate) {
+    const currentIdx = SECTION_ORDER.indexOf(section);
+    const nextSection = SECTION_ORDER[currentIdx + 1];
+    return nextSection
+      ? { action: 'transition', nextSection }
+      : { action: 'wrap_up' };
+  }
 
-  await dbClient.query(
-    `UPDATE interview_state
-     SET current_section        = $1,
-         question_index         = $2,
-         followup_count         = 0,
-         section_turn_count     = 0,
-         current_question_key   = $3,
-         question_answered      = false,
-         transition_reason      = $4,
-         last_user_turn_id      = $5,
-         last_assistant_turn_id = $6,
-         state_version          = state_version + 1,
-         updated_at             = NOW()
-     WHERE interview_session_id = $7`,
-    [next_section, next_index, current_question_key, transition_reason, userTurnId, assistantTurnId, interviewSessionId]
-  );
-
-  return { current_section: next_section, question_index: next_index };
+  // 3순위: 섹션 내 계속
+  return { action: 'continue' };
 }
 
-// ── AI 응답 생성 ──────────────────────────────────────────────────
-async function generateSallyResponse(session, state, recentTurns, userMessage, isGreeting) {
-  const questionList = session.question_list;
-  const businessSummary = session.input_context?.business_summary || '';
-  const respondentName = session.respondent_name || 'there';
+// ─────────────────────────────────────────────────────────────────
+// wrap_up 메시지 생성 (plain text)
+// ─────────────────────────────────────────────────────────────────
+async function generateWrapUpMessage(respondentName, businessContext) {
+  try {
+    const response = await anthropic.messages.create({
+      model: process.env.AI_PRIMARY_MODEL || 'claude-haiku-4-5-20251001',
+      max_tokens: 200,
+      system: `You are Sally, a warm AI interviewer wrapping up a customer development interview.
+Write 2-3 sentences: thank the respondent sincerely, then optionally ask if there's anything else to share.
+Be genuine and conversational. No bullet points or lists.`,
+      messages: [{
+        role: 'user',
+        content: `Respondent's name: ${respondentName}\nBusiness context: ${businessContext}\n\nWrite the closing message.`,
+      }],
+    });
+    return response.content[0].text;
+  } catch (err) {
+    console.error('[Interview] generateWrapUpMessage failed:', err.message);
+    return `Thank you so much, ${respondentName}! This has been really helpful. We really appreciate you taking the time to share your thoughts with us.`;
+  }
+}
 
-  const next = resolveNextQuestion(state, questionList);
+// ─────────────────────────────────────────────────────────────────
+// 리포트 비동기 생성 (fire-and-forget)
+// ─────────────────────────────────────────────────────────────────
+async function generateReport(interviewSessionId, businessContext) {
+  try {
+    await query(
+      `UPDATE reports SET status = 'generating' WHERE interview_session_id = $1`,
+      [interviewSessionId]
+    );
 
-  let systemPrompt;
-  let userPrompt;
+    const turns = await query(
+      `SELECT role, content, section FROM interview_turns
+       WHERE interview_session_id = $1
+       ORDER BY turn_index ASC`,
+      [interviewSessionId]
+    );
 
-  if (isGreeting) {
-    systemPrompt = `You are Sally, a warm and friendly AI interviewer helping a startup conduct customer research.
-Keep your response to 2-3 sentences. Be natural and conversational. Do not use bullet points or lists.`;
+    const transcript = turns.rows
+      .map((t) => `${t.role === 'assistant' ? 'Sally' : 'Respondent'} [${t.section}]: ${t.content}`)
+      .join('\n\n');
 
-    const firstQuestion = next.text || 'Tell me a bit about yourself.';
-    userPrompt = `You're starting a customer development interview.
-Startup context: "${businessSummary}"
-Respondent's name: "${respondentName}"
+    const systemPrompt = `You are an expert customer development analyst.
+Analyze this interview transcript and produce a structured report.
+Output ONLY valid JSON matching this exact schema — no other text:
+{
+  "hypothesis_verdict": "confirmed" | "mixed" | "rejected",
+  "top_pains": [{"title": "", "quote": "", "frequency": ""}],
+  "current_alternatives": [{"tool": "", "complaint": ""}],
+  "wtp_summary": "",
+  "next_actions": ["", "", ""],
+  "next_questions": ["", "", ""]
+}
+Rules:
+- hypothesis_verdict: "confirmed" if problem clearly exists and is painful, "rejected" if not, "mixed" otherwise
+- top_pains: max 3, ranked by severity. quote = exact words from respondent
+- current_alternatives: max 3 tools/methods they currently use
+- wtp_summary: 1-2 sentences summarizing willingness-to-pay signals
+- next_actions: 3 concrete things the founder should do next week
+- next_questions: 3 questions to ask in the next customer interview`;
 
-Write a brief, warm greeting (1 sentence) and then ask this first question naturally:
-"${firstQuestion}"
+    let result = null;
+    let lastError = null;
 
-Keep it casual and friendly, not formal.`;
-  } else {
-    const conversationHistory = recentTurns.map((t) =>
-      `${t.role === 'assistant' ? 'Sally' : respondentName}: ${t.content}`
-    ).join('\n');
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        const response = await anthropic.messages.create({
+          model: process.env.AI_MODEL_FALLBACK || 'claude-sonnet-4-6',
+          max_tokens: 1500,
+          system: systemPrompt,
+          messages: [{
+            role: 'user',
+            content: `Business context: ${businessContext}\n\nInterview transcript:\n${transcript}`,
+          }],
+        });
 
-    if (next.section === 'completed') {
-      systemPrompt = `You are Sally, a warm AI interviewer. Write a brief, genuine closing message.
-Keep it to 2-3 sentences. Thank the respondent sincerely. Do not ask any more questions.`;
+        const rawText = response.content[0].text;
+        const cleaned = rawText
+          .replace(/^```json\s*/i, '')
+          .replace(/^```\s*/i, '')
+          .replace(/\s*```$/i, '')
+          .trim();
 
-      userPrompt = `The interview is now complete. The respondent's last message was: "${userMessage}"
+        result = JSON.parse(cleaned);
+        break;
+      } catch (err) {
+        lastError = err;
+        console.warn(`[Report] Attempt ${attempt + 1} failed:`, err.message);
+      }
+    }
 
-Write a warm closing message thanking ${respondentName} for their time.`;
+    if (result) {
+      await query(
+        `UPDATE reports SET status = 'completed', result = $1, completed_at = NOW()
+         WHERE interview_session_id = $2`,
+        [JSON.stringify(result), interviewSessionId]
+      );
+      console.log(`[Report] Generated successfully for session ${interviewSessionId}`);
     } else {
-      systemPrompt = `You are Sally, a friendly AI interviewer conducting customer research on behalf of a startup.
-Keep each response to 1-2 sentences. Be natural and conversational.
-- Briefly acknowledge what the respondent just said (1 sentence max, no "Great!" or "Interesting!")
-- Then transition naturally into the next question
-- Do not use bullet points, lists, or formal language
-- Sound like a real conversation`;
-
-      userPrompt = `Startup context: "${businessSummary}"
-
-Recent conversation:
-${conversationHistory}
-
-${respondentName} just said: "${userMessage}"
-
-Now ask this question naturally (after briefly acknowledging their response):
-"${next.text}"`;
+      await query(
+        `UPDATE reports SET status = 'failed' WHERE interview_session_id = $1`,
+        [interviewSessionId]
+      );
+      console.error(`[Report] Failed after 3 attempts for ${interviewSessionId}:`, lastError?.message);
     }
+  } catch (err) {
+    console.error(`[Report] Unexpected error for ${interviewSessionId}:`, err.message);
+    await query(
+      `UPDATE reports SET status = 'failed' WHERE interview_session_id = $1`,
+      [interviewSessionId]
+    ).catch(() => {});
   }
-
-  const message = await anthropic.messages.create({
-    model: process.env.AI_PRIMARY_MODEL || 'claude-haiku-4-5-20251001',
-    max_tokens: parseInt(process.env.AI_MAX_TOKENS_INTERVIEW) || 700,
-    system: systemPrompt,
-    messages: [{ role: 'user', content: userPrompt }],
-  });
-
-  return {
-    content: message.content[0].text,
-    section: next.section,
-    question_index: next.question_index,
-    is_completed: next.section === 'completed',
-  };
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -260,7 +426,7 @@ router.get('/:token', async (req, res) => {
       });
     }
 
-    const turns = await loadRecentTurns(session.id, 50);
+    const turns = await loadAllTurns(session.id, 50);
 
     return res.json({
       success: true,
@@ -285,9 +451,7 @@ router.get('/:token', async (req, res) => {
 // ─────────────────────────────────────────────────────────────────
 // POST /api/interview/:token/start
 // 이름 등록 + Sally 첫 인사 생성
-// Body:     { name }
-// Response: { turns, is_completed, respondent_session_id, resume_token }
-//           재접속 시 resume_token은 null
+// 재접속: completed_sections 요약 + 최근 6턴 반환
 // ─────────────────────────────────────────────────────────────────
 router.post('/:token/start', async (req, res) => {
   const { token } = req.params;
@@ -325,22 +489,35 @@ router.post('/:token/start', async (req, res) => {
     }
 
     const isReconnect = !!session.respondent_session_id;
-    const existingTurns = await loadRecentTurns(session.id, 50);
+    const existingTurnCount = isReconnect
+      ? (await query(
+          `SELECT COUNT(*) AS cnt FROM interview_turns WHERE interview_session_id = $1`,
+          [session.id]
+        )).rows[0].cnt
+      : 0;
 
-    // 재접속: 기존 세션 + 대화 존재 → resume_token은 null 반환
-    if (isReconnect && existingTurns.length > 0) {
+    // 재접속: 기존 대화 있음 → completed_sections 요약 + 최근 6턴 반환
+    if (isReconnect && parseInt(existingTurnCount) > 0) {
+      const state = await getOrCreateState(session.id);
+      const recentTurns = await loadRecentTurnsForContext(session.id, 6);
+
       return res.json({
         success: true,
         data: {
-          turns: existingTurns,
+          turns: recentTurns,
           is_completed: session.status === 'completed',
           respondent_session_id: session.respondent_session_id,
           resume_token: null,
+          // 재접속 컨텍스트: 프론트에서 "이전 대화를 이어갑니다" 표시용
+          reconnect_context: {
+            current_section: state.current_section,
+            completed_sections: Array.isArray(state.completed_sections) ? state.completed_sections : [],
+          },
         },
       });
     }
 
-    // 최초 시작 (또는 재시도: respondent_session_id 있으나 turns 없음)
+    // 최초 시작
     let respondentSessionId = session.respondent_session_id;
     let resumeTokenPlain = null;
 
@@ -362,35 +539,69 @@ router.post('/:token/start', async (req, res) => {
         [name.trim(), respondentSessionId, resumeTokenHash, session.id]
       );
     } else {
-      // 재시도 케이스: 이름만 갱신
       await query(
-        `UPDATE interview_sessions
-         SET respondent_name  = $1,
-             last_activity_at = NOW()
-         WHERE id = $2`,
+        `UPDATE interview_sessions SET respondent_name = $1, last_activity_at = NOW() WHERE id = $2`,
         [name.trim(), session.id]
       );
     }
     session.respondent_name = name.trim();
 
-    // 상태 초기화 또는 조회
-    const state = await getOrCreateState(session.id);
+    await getOrCreateState(session.id);
 
-    // Sally 첫 인사 생성
-    const aiResponse = await generateSallyResponse(session, state, [], '', true);
+    // icebreaker 첫 인사 생성
+    const businessContext = session.input_context?.business_summary || '';
+    const allTopics = [
+      ...(session.question_list.icebreakers || []),
+      ...(session.question_list.questions   || []),
+    ];
 
-    // 어시스턴트 턴 저장 (첫 턴이므로 turn_index = 0)
+    const greetingPrompt = buildSystemPrompt({
+      section:          'icebreaker',
+      businessContext,
+      keyTopics:        allTopics,
+      completedSections: [],
+      followupCount:    0,
+      maxFollowups:     SECTION_CONFIG.icebreaker.maxFollowups,
+    });
+
+    let greetingText = `Hi ${session.respondent_name}! Great to meet you. Could you start by telling me a bit about yourself and what you do?`;
+
+    try {
+      const greetingResponse = await anthropic.messages.create({
+        model:      process.env.AI_PRIMARY_MODEL || 'claude-haiku-4-5-20251001',
+        max_tokens: parseInt(process.env.AI_MAX_TOKENS_INTERVIEW) || 700,
+        system:     greetingPrompt,
+        messages: [{
+          role:    'user',
+          content: `Start the interview. The respondent's name is ${session.respondent_name}.
+Write a warm 1-sentence greeting then naturally ask your first question — combined into one message.
+Respond in JSON: {"next_question": "greeting + first question", "needs_followup": false, "followup_reason": "", "section_complete_candidate": false, "section_completion_reason": ""}`,
+        }],
+      });
+
+      const rawText = greetingResponse.content[0].text;
+      const cleaned = rawText
+        .replace(/^```json\s*/i, '')
+        .replace(/^```\s*/i, '')
+        .replace(/\s*```$/i, '')
+        .trim();
+      const parsed = JSON.parse(cleaned);
+      if (parsed.next_question) greetingText = parsed.next_question;
+    } catch (err) {
+      console.warn('[Interview] Greeting generation failed, using fallback:', err.message);
+    }
+
     await query(
       `INSERT INTO interview_turns
          (interview_session_id, role, content, section, question_index, turn_index)
-       VALUES ($1, 'assistant', $2, $3, $4, 0)`,
-      [session.id, aiResponse.content, aiResponse.section, aiResponse.question_index]
+       VALUES ($1, 'assistant', $2, 'icebreaker', 0, 0)`,
+      [session.id, greetingText]
     );
 
     return res.json({
       success: true,
       data: {
-        turns: [{ role: 'assistant', content: aiResponse.content }],
+        turns: [{ role: 'assistant', content: greetingText }],
         is_completed: false,
         respondent_session_id: respondentSessionId,
         resume_token: resumeTokenPlain,
@@ -452,7 +663,6 @@ router.post('/:token/chat', async (req, res) => {
       });
     }
 
-    // respondent_session_id 불일치 로깅 (거부하지 않음)
     if (respondent_session_id && session.respondent_session_id &&
         respondent_session_id !== session.respondent_session_id.toString()) {
       console.warn(
@@ -461,7 +671,7 @@ router.post('/:token/chat', async (req, res) => {
       );
     }
 
-    // 멱등 처리: client_message_id 중복 시 기존 어시스턴트 응답 반환
+    // 멱등 처리: client_message_id 중복 시 기존 응답 반환
     if (client_message_id) {
       const dup = await query(
         `SELECT t1.turn_index, t2.content AS assistant_content
@@ -486,15 +696,44 @@ router.post('/:token/chat', async (req, res) => {
     }
 
     const state = await getOrCreateState(session.id);
+    const userAnswer = content.trim();
+    const wordCount = userAnswer.split(/\s+/).filter(Boolean).length;
 
-    // ── Transaction 1: 유저 턴 저장 ────────────────────────────────
-    // interview_sessions row를 FOR UPDATE로 락 → turn_index 직렬화
+    // no_response 처리 (단독 단어 1개 이하 or 2자 미만)
+    if (wordCount <= 1 && userAnswer.length < 3) {
+      const newCount = (state.no_response_count || 0) + 1;
+      await query(
+        `UPDATE interview_state SET no_response_count = $1, updated_at = NOW()
+         WHERE interview_session_id = $2`,
+        [newCount, session.id]
+      );
+      if (newCount >= 3) {
+        await query(
+          `UPDATE interview_sessions
+           SET status = 'abandoned', abandoned_at = NOW(), last_activity_at = NOW()
+           WHERE id = $1`,
+          [session.id]
+        );
+        return res.json({
+          success: true,
+          data: {
+            message: {
+              role: 'assistant',
+              content: "It seems like you're having trouble responding right now. Feel free to come back anytime — the link will still be active.",
+            },
+            is_completed: false,
+            abandoned: true,
+          },
+        });
+      }
+    }
+
+    // ── Transaction 1: user turn 저장 ──────────────────────────────
     let userTurnId;
     {
       const dbClient = await pool.connect();
       try {
         await dbClient.query('BEGIN');
-
         await dbClient.query(
           `SELECT lock_version FROM interview_sessions WHERE id = $1 FOR UPDATE`,
           [session.id]
@@ -511,17 +750,14 @@ router.post('/:token/chat', async (req, res) => {
              (interview_session_id, role, content, section, question_index, turn_index, client_message_id)
            VALUES ($1, 'user', $2, $3, $4, $5, $6)
            RETURNING id`,
-          [session.id, content.trim(), state.current_section, state.question_index, next_index, client_message_id || null]
+          [session.id, userAnswer, state.current_section, state.question_index, next_index, client_message_id || null]
         );
         userTurnId = userTurn.id;
 
         await dbClient.query(
-          `UPDATE interview_sessions
-           SET lock_version = lock_version + 1, last_activity_at = NOW()
-           WHERE id = $1`,
+          `UPDATE interview_sessions SET lock_version = lock_version + 1, last_activity_at = NOW() WHERE id = $1`,
           [session.id]
         );
-
         await dbClient.query('COMMIT');
       } catch (err) {
         await dbClient.query('ROLLBACK');
@@ -531,17 +767,85 @@ router.post('/:token/chat', async (req, res) => {
       }
     }
 
-    // ── AI 응답 생성 (트랜잭션 외부) ───────────────────────────────
-    const recentTurns = await loadRecentTurns(session.id, 8);
-    const aiResponse = await generateSallyResponse(session, state, recentTurns, content.trim(), false);
+    // ── AI 결정 + 응답 생성 (트랜잭션 외부) ────────────────────────
+    const businessContext = session.input_context?.business_summary || '';
+    const allTopics = [
+      ...(session.question_list.icebreakers || []),
+      ...(session.question_list.questions   || []),
+    ];
+    const completedSections = Array.isArray(state.completed_sections)
+      ? state.completed_sections
+      : [];
 
-    // ── Transaction 2: 어시스턴트 턴 + 상태 업데이트 ───────────────
+    // 응답자가 종료 의사를 명확히 밝힌 경우 → 즉시 wrap_up
+    const userWantsStop = /^(stop|quit|end|exit|bye|goodbye|done|finish)\.?$/i.test(userAnswer);
+
+    let assistantText;
+    let finalSection = state.current_section;
+    let isCompleted = false;
+    let decision;
+    let sectionSummaryForTransition = null; // transition 시 한 번만 조회
+
+    if (userWantsStop || state.current_section === 'wrap_up') {
+      decision = { action: 'wrap_up' };
+      assistantText = await generateWrapUpMessage(session.respondent_name, businessContext);
+      finalSection = 'wrap_up';
+      isCompleted = true;
+
+    } else {
+      // 1. 현재 섹션 context로 Claude 호출
+      const systemPrompt = buildSystemPrompt({
+        section:          state.current_section,
+        businessContext,
+        keyTopics:        allTopics,
+        completedSections,
+        followupCount:    state.followup_count || 0,
+        maxFollowups:     SECTION_CONFIG[state.current_section]?.maxFollowups ?? 0,
+      });
+
+      // user turn 저장 후 context 로드 (현재 user 턴 포함)
+      const recentTurns = await loadRecentTurnsForContext(session.id, 6);
+      const claudeResult = await callClaudeForTurn(systemPrompt, recentTurns);
+
+      // 2. 서버 최종 결정
+      decision = makeServerDecision(state, claudeResult, wordCount);
+
+      if (decision.action === 'transition') {
+        // 전환: 현재 섹션 요약 생성 후 새 섹션 opening 질문 요청
+        sectionSummaryForTransition = await buildSectionSummary(session.id, state.current_section);
+        const updatedCompletedSections = [...completedSections, sectionSummaryForTransition];
+
+        const nextSystemPrompt = buildSystemPrompt({
+          section:          decision.nextSection,
+          businessContext,
+          keyTopics:        allTopics,
+          completedSections: updatedCompletedSections,
+          followupCount:    0,
+          maxFollowups:     SECTION_CONFIG[decision.nextSection]?.maxFollowups ?? 0,
+        });
+
+        const nextResult = await callClaudeForTurn(nextSystemPrompt, recentTurns);
+        assistantText = nextResult.next_question;
+        finalSection = decision.nextSection;
+
+      } else if (decision.action === 'wrap_up') {
+        assistantText = await generateWrapUpMessage(session.respondent_name, businessContext);
+        finalSection = 'wrap_up';
+        isCompleted = true;
+
+      } else {
+        // followup or continue: Claude가 생성한 next_question 사용
+        assistantText = claudeResult.next_question;
+        finalSection = state.current_section;
+      }
+    }
+
+    // ── Transaction 2: assistant turn + state 업데이트 ──────────────
     let assistantTurnId;
     {
       const dbClient = await pool.connect();
       try {
         await dbClient.query('BEGIN');
-
         await dbClient.query(
           `SELECT lock_version FROM interview_sessions WHERE id = $1 FOR UPDATE`,
           [session.id]
@@ -558,14 +862,75 @@ router.post('/:token/chat', async (req, res) => {
              (interview_session_id, role, content, section, question_index, turn_index)
            VALUES ($1, 'assistant', $2, $3, $4, $5)
            RETURNING id`,
-          [session.id, aiResponse.content, aiResponse.section, aiResponse.question_index, next_index]
+          [session.id, assistantText, finalSection, state.question_index, next_index]
         );
         assistantTurnId = assistantTurn.id;
 
-        // 상태 진행 + state_version 증가
-        await advanceState(dbClient, session.id, state, session.question_list, userTurnId, assistantTurnId);
+        // 섹션별 state 업데이트
+        const candidateTurnCount = (state.section_turn_count || 0) + 1;
 
-        if (aiResponse.is_completed) {
+        if (decision.action === 'followup') {
+          await dbClient.query(
+            `UPDATE interview_state
+             SET followup_count         = followup_count + 1,
+                 section_turn_count     = $1,
+                 last_user_turn_id      = $2,
+                 last_assistant_turn_id = $3,
+                 state_version          = state_version + 1,
+                 updated_at             = NOW()
+             WHERE interview_session_id = $4`,
+            [candidateTurnCount, userTurnId, assistantTurnId, session.id]
+          );
+
+        } else if (decision.action === 'continue') {
+          await dbClient.query(
+            `UPDATE interview_state
+             SET question_index         = question_index + 1,
+                 section_turn_count     = $1,
+                 followup_count         = 0,
+                 last_user_turn_id      = $2,
+                 last_assistant_turn_id = $3,
+                 state_version          = state_version + 1,
+                 updated_at             = NOW()
+             WHERE interview_session_id = $4`,
+            [candidateTurnCount, userTurnId, assistantTurnId, session.id]
+          );
+
+        } else if (decision.action === 'transition') {
+          // sectionSummaryForTransition은 AI 단계에서 이미 조회함
+          await dbClient.query(
+            `UPDATE interview_state
+             SET current_section        = $1,
+                 question_index         = 0,
+                 section_turn_count     = 0,
+                 followup_count         = 0,
+                 completed_sections     = completed_sections || $2::jsonb,
+                 transition_reason      = 'section_complete',
+                 last_user_turn_id      = $3,
+                 last_assistant_turn_id = $4,
+                 state_version          = state_version + 1,
+                 updated_at             = NOW()
+             WHERE interview_session_id = $5`,
+            [decision.nextSection, JSON.stringify(sectionSummaryForTransition), userTurnId, assistantTurnId, session.id]
+          );
+
+        } else {
+          // wrap_up
+          await dbClient.query(
+            `UPDATE interview_state
+             SET current_section        = 'wrap_up',
+                 section_turn_count     = $1,
+                 transition_reason      = 'interview_complete',
+                 last_user_turn_id      = $2,
+                 last_assistant_turn_id = $3,
+                 state_version          = state_version + 1,
+                 updated_at             = NOW()
+             WHERE interview_session_id = $4`,
+            [candidateTurnCount, userTurnId, assistantTurnId, session.id]
+          );
+        }
+
+        if (isCompleted) {
           await dbClient.query(
             `UPDATE interview_sessions
              SET status           = 'completed',
@@ -584,9 +949,7 @@ router.post('/:token/chat', async (req, res) => {
           );
         } else {
           await dbClient.query(
-            `UPDATE interview_sessions
-             SET lock_version = lock_version + 1, last_activity_at = NOW()
-             WHERE id = $1`,
+            `UPDATE interview_sessions SET lock_version = lock_version + 1, last_activity_at = NOW() WHERE id = $1`,
             [session.id]
           );
         }
@@ -600,11 +963,18 @@ router.post('/:token/chat', async (req, res) => {
       }
     }
 
+    // 리포트 비동기 생성 (completed 후 fire-and-forget)
+    if (isCompleted) {
+      generateReport(session.id, businessContext).catch((err) =>
+        console.error('[Interview] generateReport fire-and-forget error:', err.message)
+      );
+    }
+
     return res.json({
       success: true,
       data: {
-        message: { role: 'assistant', content: aiResponse.content },
-        is_completed: aiResponse.is_completed,
+        message: { role: 'assistant', content: assistantText },
+        is_completed: isCompleted,
       },
     });
   } catch (err) {
@@ -618,20 +988,16 @@ router.post('/:token/chat', async (req, res) => {
 
 // ─────────────────────────────────────────────────────────────────
 // POST /api/interview/:token/heartbeat
-// 마지막 활동 시간 갱신 (클라이언트 fire-and-forget용)
 // ─────────────────────────────────────────────────────────────────
 router.post('/:token/heartbeat', async (req, res) => {
   const { token } = req.params;
 
   try {
     await query(
-      `UPDATE interview_sessions
-       SET last_activity_at = NOW()
-       WHERE link_token = $1
-         AND status = 'in_progress'`,
+      `UPDATE interview_sessions SET last_activity_at = NOW()
+       WHERE link_token = $1 AND status = 'in_progress'`,
       [token]
     );
-
     return res.json({ success: true });
   } catch (err) {
     console.error('[Interview] POST /:token/heartbeat error:', err.message);
