@@ -7,7 +7,7 @@ import React, { useState, useCallback } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity,
   ScrollView, StyleSheet, Alert, Clipboard,
-  Share, Pressable,
+  Share, Pressable, Modal, Platform,
 } from 'react-native';
 
 import NeuCard from './NeuCard';
@@ -18,7 +18,7 @@ import ModalDialog from './ModalDialog';
 import useStore from '../store/useStore';
 import { questionListsApi, interviewSessionsApi } from '../api/client';
 import { colors, spacing, radius, textStyles, shadows } from '../theme';
-import { Copy, Share2, Link } from 'lucide-react-native';
+import { Copy, Share2 } from 'lucide-react-native';
 
 export default function QuestionsPanel({ scrollRef, style }) {
   const { questionListCache, currentListId, generatedItems, updateQuestion, toggleHidden, setQuestionList, sessionForm } = useStore();
@@ -32,9 +32,9 @@ export default function QuestionsPanel({ scrollRef, style }) {
   const [regenInput, setRegenInput] = useState('');
   const [isRegening, setIsRegening] = useState(false);
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
-  const [showShareModal, setShowShareModal] = useState(false);
+  const [showLinkModal, setShowLinkModal] = useState(false);
   const [shareLink, setShareLink] = useState('');
-  const [isCreatingLink, setIsCreatingLink] = useState(false);
+  const [isLoadingLink, setIsLoadingLink] = useState(false);
 
   const toggle = useCallback(
     (id) => setExpanded((prev) => (prev === id ? null : id)),
@@ -68,7 +68,7 @@ export default function QuestionsPanel({ scrollRef, style }) {
       )
       .join('\n\n');
     Clipboard.setString(txt);
-    Alert.alert('Copied', 'opied to clipboard.');
+    Alert.alert('Copied', 'Copied to clipboard.');
   }
 
   function handleExportPress() {
@@ -88,24 +88,25 @@ export default function QuestionsPanel({ scrollRef, style }) {
     await Share.share({ message: md });
   }
 
-  async function handleCreateShareLink() {
+  // 링크 조회(있으면 재사용) 또는 신규 생성
+  async function handleFinalizePress() {
     if (!listId) return;
-    setIsCreatingLink(true);
+    setIsLoadingLink(true);
     try {
-      const res = await interviewSessionsApi.create(listId);
-      setShareLink(res.data.url);
-      setShowShareModal(true);
+      const res = await interviewSessionsApi.list(listId);
+      let url;
+      if (res.data.length > 0) {
+        url = res.data[0].url;
+      } else {
+        const created = await interviewSessionsApi.create(listId);
+        url = created.data.url;
+      }
+      setShareLink(url);
+      setShowLinkModal(true);
     } catch (err) {
-      Alert.alert('Error', err.message || 'Failed to create interview link.');
+      Alert.alert('Error', err.message || 'Failed to get interview link.');
     } finally {
-      setIsCreatingLink(false);
-    }
-  }
-
-  function handleCopyShareLink() {
-    if (shareLink) {
-      Clipboard.setString(shareLink);
-      Alert.alert('Copied!', 'Interview link copied to clipboard.');
+      setIsLoadingLink(false);
     }
   }
 
@@ -136,14 +137,6 @@ export default function QuestionsPanel({ scrollRef, style }) {
             </TouchableOpacity>
             <TouchableOpacity style={styles.iconBtn} onPress={handleExportPress} title="공유하기">
               <Share2 size={20} color={colors.textSecondary} />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.iconBtn, styles.linkBtn]}
-              onPress={handleCreateShareLink}
-              disabled={isCreatingLink}
-              title="인터뷰 링크 생성"
-            >
-              <Link size={18} color={colors.white} />
             </TouchableOpacity>
           </View>
         </View>
@@ -182,14 +175,10 @@ export default function QuestionsPanel({ scrollRef, style }) {
                   if (p.deleted) {
                     const hideKey = item.type === 'icebreaker' ? item.number : item.index;
                     const nextHidden = !item.hidden;
-
-                    // 1) 즉시 UI 반영 (optimistic)
                     toggleHidden(listId, hideKey, nextHidden);
-
-                    // 2) 서버 동기화, 실패 시 롤백
                     questionListsApi.hideOne(listId, hideKey, nextHidden)
                       .catch((err) => {
-                        toggleHidden(listId, hideKey, !nextHidden); // 롤백
+                        toggleHidden(listId, hideKey, !nextHidden);
                         window.alert('오류: ' + err.message);
                       });
                   } else {
@@ -206,7 +195,6 @@ export default function QuestionsPanel({ scrollRef, style }) {
               isOpen={isOpen}
               onToggle={() => toggle(id)}
               listId={listId}
-              // 수정
               onUpdate={(p) => {
                 if (p.deleted) {
                   const hideKey = item.type === 'icebreaker' ? item.number : item.index;
@@ -225,33 +213,61 @@ export default function QuestionsPanel({ scrollRef, style }) {
           );
         })}
 
-        {/* 하단 내보내기 (패널 모드에서는 scroll 내부에) */}
+        {/* CTA — 인터뷰 링크 생성/공유 */}
         <GradientButton
-          label="Finalize → Export"
-          onPress={handleExportPress}
+          label={isLoadingLink ? 'Loading...' : 'Finalize → Share Link'}
+          onPress={handleFinalizePress}
+          loading={isLoadingLink}
           style={{ marginTop: spacing.md }}
         />
       </Pressable>
 
-      {/* 인터뷰 링크 공유 모달 */}
-      <ModalDialog
-        visible={showShareModal}
-        title="Interview Link Created"
-        message={[
-          'Share this link with your interviewee.',
-          shareLink,
-        ]}
-        mode="confirm"
-        confirmLabel="Copy Link"
-        cancelLabel="Close"
-        confirmColor={colors.primary}
-        onConfirm={() => {
-          handleCopyShareLink();
-          setShowShareModal(false);
-        }}
-        onCancel={() => setShowShareModal(false)}
-      />
+      {/* 인터뷰 링크 모달 */}
+      <Modal
+        visible={showLinkModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowLinkModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Your Interview Link</Text>
+            <Text style={styles.modalSubtitle}>Share this link with your interviewee.</Text>
 
+            <View style={styles.linkBox}>
+              <Text style={styles.linkText} selectable>{shareLink}</Text>
+            </View>
+
+            <TouchableOpacity
+              style={styles.modalBtnPrimary}
+              onPress={() => {
+                Clipboard.setString(shareLink);
+                Alert.alert('Copied!', 'Interview link copied to clipboard.');
+              }}
+            >
+              <Text style={styles.modalBtnPrimaryText}>Copy Link</Text>
+            </TouchableOpacity>
+
+            {Platform.OS !== 'web' && (
+              <TouchableOpacity
+                style={styles.modalBtnSecondary}
+                onPress={() => Share.share({ message: shareLink })}
+              >
+                <Text style={styles.modalBtnSecondaryText}>Share</Text>
+              </TouchableOpacity>
+            )}
+
+            <TouchableOpacity
+              style={styles.modalBtnClose}
+              onPress={() => setShowLinkModal(false)}
+            >
+              <Text style={styles.modalBtnCloseText}>Close</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* 질문 리스트 공유 (Share2 아이콘 → 팀원 공유용) */}
       <ModalDialog
         visible={showFeedbackModal}
         title="Before you export..."
@@ -390,10 +406,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     ...shadows.card,
   },
-  linkBtn: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
-  },
   iconBtnText: { fontSize: 17, color: colors.textSecondary },
 
   regenRow: {
@@ -448,4 +460,82 @@ const styles = StyleSheet.create({
 
   chevron: { fontSize: 17, color: colors.textDisabled, paddingTop: 2 },
   chevronOpen: { transform: [{ rotate: '90deg' }] },
+
+  // ── 링크 모달 ────────────────────────────────────────────────
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: spacing.lg,
+  },
+  modalCard: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.lg,
+    width: '100%',
+    maxWidth: 420,
+    gap: spacing.sm,
+    ...shadows.card,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: colors.textPrimary,
+    marginBottom: 2,
+  },
+  modalSubtitle: {
+    fontSize: 13,
+    color: colors.textSecondary,
+    marginBottom: spacing.xs,
+  },
+  linkBox: {
+    backgroundColor: colors.background,
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingVertical: 10,
+    paddingHorizontal: spacing.md,
+    marginBottom: spacing.xs,
+  },
+  linkText: {
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+    fontSize: 13,
+    color: colors.primary,
+    lineHeight: 20,
+  },
+  modalBtnPrimary: {
+    backgroundColor: colors.primary,
+    borderRadius: radius.sm,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  modalBtnPrimaryText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: colors.white,
+  },
+  modalBtnSecondary: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  modalBtnSecondaryText: {
+    fontSize: 15,
+    fontWeight: '500',
+    color: colors.textPrimary,
+  },
+  modalBtnClose: {
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  modalBtnCloseText: {
+    fontSize: 14,
+    color: colors.textDisabled,
+  },
 });
