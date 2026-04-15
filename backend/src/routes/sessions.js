@@ -303,11 +303,36 @@ router.get('/:id/generate-stream', authenticateGuest, async (req, res) => {
       return res.end();
     }
 
+    // ── 개별 질문 이벤트 즉시 전송 (DB 저장 전) ──
+    // token 스트림 직후 동기적으로 전송해야 브라우저에 도달함.
+    // await(DB 저장)가 이벤트 루프에 양보하면서 아래 writes를 flush함.
+    for (const ice of parsed.icebreakers || []) {
+      sendEvent('icebreaker', {
+        type: 'icebreaker',
+        text: ice.text || ice.question_text || '',
+        why: ice.why || '',
+        follow_up: Array.isArray(ice.follow_up) ? ice.follow_up : [],
+      });
+    }
+    for (let i = 0; i < (parsed.questions || []).length; i++) {
+      const q = parsed.questions[i];
+      sendEvent('question', {
+        type: 'question',
+        number: i + 1,
+        index: i,
+        text: q.text || q.question_text || '',
+        why: q.why || '',
+        follow_up: Array.isArray(q.follow_up) ? q.follow_up
+          : typeof q.follow_up === 'string' ? [q.follow_up]
+            : [],
+      });
+    }
+
     // ── 비용 계산 ──
     const cost = (inputTokens / 1_000_000) * 1.0 + (outputTokens / 1_000_000) * 5.0;
     const generationTime = ((Date.now() - startTime) / 1000).toFixed(1);
 
-    // ── DB 저장 ──
+    // ── DB 저장 (이벤트 전송 후 비동기 실행) ──
     let questionListId;
     try {
       await withRLS(req.guestId, async (client) => {
@@ -356,29 +381,6 @@ router.get('/:id/generate-stream', authenticateGuest, async (req, res) => {
       });
     } catch (dbErr) {
       console.error('[Sessions] DB save error:', dbErr.message);
-    }
-
-    // ── 개별 질문 이벤트 전송 ──
-    for (const ice of parsed.icebreakers || []) {
-      sendEvent('icebreaker', {
-        type: 'icebreaker',
-        text: ice.text || ice.question_text || '',
-        why: ice.why || '',
-        follow_up: Array.isArray(ice.follow_up) ? ice.follow_up : [],
-      });
-    }
-    for (let i = 0; i < (parsed.questions || []).length; i++) {
-      const q = parsed.questions[i];
-      sendEvent('question', {
-        type: 'question',
-        number: i + 1,
-        index: i,
-        text: q.text || q.question_text || '',
-        why: q.why || '',
-        follow_up: Array.isArray(q.follow_up) ? q.follow_up
-          : typeof q.follow_up === 'string' ? [q.follow_up]
-            : [],
-      });
     }
 
     // ── 완료 이벤트 ──
