@@ -148,6 +148,50 @@ export default function CreateScreen({ navigation }) {
   const streamingChunkRef = useRef('');
   const [streamingDisplay, setStreamingDisplay] = useState('');
 
+  // ── 카드 큐 (300ms 간격 순차 표시) ──────────────────────────
+  const itemQueueRef = useRef([]);
+  const queueTimerRef = useRef(null);
+  const afterQueueRef = useRef(null);  // 큐 소진 후 실행할 콜백
+  const enqueuedCountRef = useRef(0);  // 총 enqueue된 아이템 수
+
+  // processQueueRef: 항상 최신 클로저를 유지하는 재귀 큐 프로세서
+  const processQueueRef = useRef(null);
+  processQueueRef.current = () => {
+    if (itemQueueRef.current.length === 0) {
+      queueTimerRef.current = null;
+      if (afterQueueRef.current) {
+        const cb = afterQueueRef.current;
+        afterQueueRef.current = null;
+        cb();
+      }
+      return;
+    }
+    const item = itemQueueRef.current.shift();
+    appendGeneratedItem(item);
+    setTimeout(() => rightScrollRef.current?.scrollToEnd({ animated: true }), 50);
+    queueTimerRef.current = setTimeout(() => processQueueRef.current(), 300);
+  };
+
+  function enqueueItem(item) {
+    streamingChunkRef.current = '';
+    setStreamingDisplay('');
+    itemQueueRef.current.push(item);
+    enqueuedCountRef.current += 1;
+    if (!queueTimerRef.current) {
+      queueTimerRef.current = setTimeout(() => processQueueRef.current(), 300);
+    }
+  }
+
+  function clearQueue() {
+    if (queueTimerRef.current) {
+      clearTimeout(queueTimerRef.current);
+      queueTimerRef.current = null;
+    }
+    itemQueueRef.current = [];
+    afterQueueRef.current = null;
+    enqueuedCountRef.current = 0;
+  }
+
   const toggleLeft = () => {
     const toValue = leftVisible ? 40 : 400;
     Animated.timing(panelWidth, {
@@ -209,6 +253,7 @@ export default function CreateScreen({ navigation }) {
 
       console.log('[DEBUG] 세션 생성 성공:', session.id);
 
+      clearQueue();
       resetGeneration();
       setMode('generating');
       setIsGenerating(true);
@@ -229,60 +274,62 @@ export default function CreateScreen({ navigation }) {
           }
         },
         onIcebreaker: (item) => {
-          appendGeneratedItem(item);
-          streamingChunkRef.current = '';
-          setStreamingDisplay('');
-          setTimeout(() => rightScrollRef.current?.scrollToEnd({ animated: true }), 150);
+          enqueueItem(item);
         },
         onQuestion: (item) => {
-          appendGeneratedItem(item);
-          streamingChunkRef.current = '';
-          setStreamingDisplay('');
-          setTimeout(() => rightScrollRef.current?.scrollToEnd({ animated: true }), 150);
+          enqueueItem(item);
         },
 
-        // complete: question_list_id 받아서 REST로 질문 배열 가져오기
-        onComplete: async (data) => {
+        // complete: 큐가 모두 소진된 후 REST로 질문 배열 가져오기
+        onComplete: (data) => {
           console.log('[DEBUG] complete 이벤트:', data);
 
-          const listId = data.question_list_id;
-          if (!listId) {
-            console.error('[DEBUG] question_list_id 없음');
-            setIsGenerating(false);
-            setMode('input');
-            Alert.alert('Error', 'Failed to receive question list ID.');
-            return;
-          }
+          const totalEnqueued = enqueuedCountRef.current;
 
-          try {
-            // REST GET으로 정규화된 질문 배열 가져오기
-            const listRes = await questionListsApi.get(listId);
-            const list = listRes.question_list;
-            console.log('[DEBUG] 질문 리스트 로드 성공:', list.questions?.length, '개');
-
-            // store에 저장
-            setQuestionList(listId, list);
-            setCurrentListId(listId);
-            setHistoryRefresh(Date.now()); // ← 추가
-
-            // UI 전환
-            setIsGenerating(false);
-            setNavTitle(list.title || businessSummary.trim().slice(0, 24));
-
-            // 카드 애니메이션이 보일 수 있도록 잠깐 대기 (resetGeneration() 전에 계산)
-            await new Promise((resolve) => setTimeout(resolve, generatedItems.length * 120 + 500));
-
-            if (isDesktop) {
-              setMode('questions');
-            } else {
-              navigation.navigate('Questions');
+          afterQueueRef.current = async () => {
+            const listId = data.question_list_id;
+            if (!listId) {
+              console.error('[DEBUG] question_list_id 없음');
+              setIsGenerating(false);
+              setMode('input');
+              Alert.alert('Error', 'Failed to receive question list ID.');
+              return;
             }
-            resetGeneration();
-          } catch (fetchErr) {
-            console.error('[DEBUG] 질문 리스트 GET 실패:', fetchErr.message);
-            setIsGenerating(false);
-            setMode('input');
-            Alert.alert('Error', 'Failed to load questions.');
+
+            try {
+              const listRes = await questionListsApi.get(listId);
+              const list = listRes.question_list;
+              console.log('[DEBUG] 질문 리스트 로드 성공:', list.questions?.length, '개');
+
+              setQuestionList(listId, list);
+              setCurrentListId(listId);
+              setHistoryRefresh(Date.now());
+              setNavTitle(list.title || businessSummary.trim().slice(0, 24));
+
+              // 모든 카드 애니메이션 완료 대기 후 thinking 박스 제거
+              await new Promise((resolve) => setTimeout(resolve, totalEnqueued * 120 + 500));
+
+              setIsGenerating(false);
+
+              if (isDesktop) {
+                setMode('questions');
+              } else {
+                navigation.navigate('Questions');
+              }
+              resetGeneration();
+            } catch (fetchErr) {
+              console.error('[DEBUG] 질문 리스트 GET 실패:', fetchErr.message);
+              setIsGenerating(false);
+              setMode('input');
+              Alert.alert('Error', 'Failed to load questions.');
+            }
+          };
+
+          // 큐가 이미 비어 있으면 즉시 실행, 아니면 큐 소진 후 자동 실행됨
+          if (!queueTimerRef.current && itemQueueRef.current.length === 0) {
+            const cb = afterQueueRef.current;
+            afterQueueRef.current = null;
+            cb();
           }
         },
 
