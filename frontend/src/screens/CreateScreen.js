@@ -1,9 +1,5 @@
 // frontend/src/screens/CreateScreen.js
-// v4 fix: 백엔드 연동 버그 수정
-//   1. res.session 으로 세션 ID 파싱
-//   2. onComplete에서 questionListsApi.get() 호출 후 store 저장
-//   3. 콜백: onChunk, onComplete, onError 만 사용
-//   4. padding 단축 표기 제거
+// v5: 단계형 상태 메시지 UX (token 스트리밍 텍스트 표시 제거)
 
 import React, { useState, useEffect, useRef } from 'react';
 import {
@@ -142,8 +138,8 @@ export default function CreateScreen({ navigation }) {
   const [isLoading, setIsLoading] = useState(false);
   const [leftVisible, setLeftVisible] = useState(true);
   const panelWidth = useRef(new Animated.Value(400)).current;
-  const streamingChunkRef = useRef('');
-  const [streamingDisplay, setStreamingDisplay] = useState('');
+  const [statusMessage, setStatusMessage] = useState('');
+  const tokenReceivedRef = useRef(false);
 
   // ── 카드 큐 (500ms 간격 순차 표시) ──────────────────────────
   const itemQueueRef = useRef([]);
@@ -170,8 +166,6 @@ export default function CreateScreen({ navigation }) {
   };
 
   function enqueueItem(item) {
-    streamingChunkRef.current = '';
-    setStreamingDisplay('');
     itemQueueRef.current.push(item);
     enqueuedCountRef.current += 1;
     if (!queueTimerRef.current) {
@@ -252,6 +246,8 @@ export default function CreateScreen({ navigation }) {
 
       clearQueue();
       resetGeneration();
+      tokenReceivedRef.current = false;
+      setStatusMessage('Sally가 사업 맥락을 파악하는 중...');
       setMode('generating');
       setIsGenerating(true);
       setNavTitle('Generating...');
@@ -260,26 +256,25 @@ export default function CreateScreen({ navigation }) {
       console.log('[DEBUG] streamGenerateQuestions 호출 시작');
 
       const close = await streamGenerateQuestions(session.id, {
-        onChunk: (text) => {
-          streamingChunkRef.current += text;
-          // 100ms마다만 UI 업데이트 (throttle)
-          if (!streamingChunkRef._timer) {
-            streamingChunkRef._timer = setTimeout(() => {
-              setStreamingDisplay(streamingChunkRef.current);
-              streamingChunkRef._timer = null;
-            }, 100);
+        onChunk: () => {
+          if (!tokenReceivedRef.current) {
+            tokenReceivedRef.current = true;
+            setStatusMessage('인터뷰 구조를 설계하는 중...');
           }
         },
         onIcebreaker: (item) => {
+          setStatusMessage('✓ 아이스브레이킹 완성');
           enqueueItem(item);
         },
         onQuestion: (item) => {
+          setStatusMessage('✓ 질문 리스트 완성');
           enqueueItem(item);
         },
 
         // complete: 큐가 모두 소진된 후 REST로 질문 배열 가져오기
         onComplete: (data) => {
-          console.log('[DEBUG] complete 이벤트:', data);
+          console.log('[COMPLETE] | queueLen:', itemQueueRef.current.length, '| timerActive:', !!queueTimerRef.current, '| data:', data);
+          setStatusMessage('인터뷰 질문이 준비됐어요! 🎉');
 
           afterQueueRef.current = async () => {
             // 이 시점: 큐가 비어있음 = 마지막 카드 표시 후 500ms 경과
@@ -527,23 +522,13 @@ export default function CreateScreen({ navigation }) {
                   <AnimatedCard key={idx} item={item} />
                 ))}
 
-                {/* 현재 생성 중인 항목 미리보기 */}
+                {/* 단계형 상태 메시지 박스 */}
                 {isGenerating && (
-                  <NeuCard style={[styles.streamCard, {
-                    borderLeftWidth: 3,
-                    borderLeftColor: colors.primaryMid,
-                    opacity: 0.7,
-                  }]}>
-                    <DotIndicator />
-                    {streamingDisplay ? (
-                      <Text style={{ ...textStyles.bodyS, color: colors.textPrimary, lineHeight: 22, marginTop: 8 }}>
-                        {streamingDisplay
-                          .replace(/[{}"\\[\]]/g, '')
-                          .replace(/\s+/g, ' ')
-                          .slice(-150)
-                          .trim()}
-                      </Text>
-                    ) : null}
+                  <NeuCard style={[styles.streamCard, styles.thinkingCard]}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+                      <DotIndicator />
+                    </View>
+                    <Text style={styles.statusText}>{statusMessage}</Text>
                   </NeuCard>
                 )}
 
@@ -628,6 +613,19 @@ const styles = StyleSheet.create({
     paddingVertical: 13,
     paddingHorizontal: 18,
     marginBottom: spacing.sm,
+  },
+  thinkingCard: {
+    borderLeftWidth: 3,
+    borderLeftColor: colors.primaryMid,
+    opacity: 0.85,
+    minHeight: 72,
+    justifyContent: 'center',
+  },
+  statusText: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    marginTop: 8,
+    lineHeight: 20,
   },
 
   field: { gap: spacing.xs },
