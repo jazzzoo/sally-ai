@@ -5,6 +5,7 @@ Rules you MUST follow without exception:
 - ONLY talk about past experiences, specific events, and what actually happened.
 - ALL questions MUST be anchored to a specific past event ("Tell me about the last time...")
 - No yes/no questions. No hypothetical "would you" questions. No frequency estimates.
+- No price, value, willingness-to-pay, or budget questions (covered in Session 4).
 - Prioritize revealing: what they actually did, emotional impact, real consequences.
 
 ---
@@ -16,13 +17,14 @@ The goal is to confirm or disprove the founder's hypothesis through real stories
 ## Strictly Prohibited
 - Never mention solutions, products, features, or ideas
 - No hypothetical "what if this existed?" scenarios
-- No payment intent or pricing questions (covered in Session 4)
+- No payment intent, pricing, value, or WTP questions (covered in Session 4)
 - No MVP or prototype questions (covered in Session 3)
 - No leading questions like "Wasn't that inconvenient?"
 - No closed yes/no questions
-- No "How often do you..." (use past event anchor instead)
+- No "How often do you..." (use "the last time..." anchor instead)
 - No "What would need to be different..." or Magic Wand questions
-- No "What would it be worth..." questions
+- No "What would it be worth..." or any price/value questions
+- No wtp section — Session 1 ends after alternatives
 
 ## Section-Intent Assignment (REQUIRED — assign section + intent to every question)
 
@@ -34,35 +36,51 @@ context section (1~2 questions):
     - role_context: "Tell me about a recent project where [relevant context] came up. What was your role and what did you have to deal with?"
 
 problems section (2~3 questions):
-  - intent options: "recent_pain_event", "pain_severity"
-  - Goal: surface a specific painful moment and its real consequences
+  - intent options: "recent_pain_event", "pain_severity", "pain_frequency"
+  - Goal: surface a specific painful moment, its real consequences, and how often it strikes
   - Example questions (adapt to the specific persona/business):
     - recent_pain_event: "Tell me about the last time [relevant problem] happened. What exactly went wrong?"
     - pain_severity: "Walk me through what happened after that — what did you have to do to deal with it, and what did it cost you?"
+    - pain_frequency: "Think back to the last time you wanted to [do X] but couldn't because of this. What stopped you and what did you do instead?"
 
 alternatives section (1~2 questions):
-  - intent options: "current_workaround", "switch_trigger"
+  - intent options: "current_workaround", "switch_trigger", "alternative_usage", "objection_probe"
   - Goal: understand what they actually tried and why it wasn't enough
   - Example questions (adapt to the specific persona/business):
     - current_workaround: "What did you actually do to handle that situation? Walk me through the steps you took."
     - switch_trigger: "Describe the moment you realized your current approach wasn't working. What happened right before that?"
-
-wtp section (1 question):
-  - intent options: "switch_trigger"
-  - Goal: reveal the emotional tipping point — what made them desperate enough to change
-  - Example questions (adapt to the specific persona/business):
-    - switch_trigger: "Tell me about the moment when you thought 'I can't keep doing this the same way.' What had just happened?"
+    - alternative_usage: "Tell me about the last time you tried a different tool or method for this. What made you switch, and what happened?"
+    - objection_probe: "Walk me through the last time you considered changing how you handle this. What held you back?"
 
 ## Quality Validation
 After generating, self-verify:
+
+COUNT CHECK:
 - Total questions: 6~7 (excluding icebreakers)
-- Zero solution mentions (fix immediately if violated)
-- Zero hypothetical or future-oriented questions (fix immediately if violated)
-- 100% of questions use past-behavior anchor forms ("Tell me about...", "Walk me through...", "Describe a specific...")
 - context: ≥1 question with section="context"
 - problems: ≥2 questions with section="problems"
 - alternatives: ≥1 question with section="alternatives"
-- wtp: ≥1 question with section="wtp"
+- wtp: 0 questions — Session 1 has NO wtp section
+
+HARD BANNED (fix immediately if any appear):
+- "What would need to be different..." → rewrite as past-behavior
+- "What would it be worth..." → remove entirely
+- "If you had a magic wand..." → remove entirely
+- "How often do you..." → rewrite as "Think back to the last time..."
+- "What's your current approach..." → rewrite as "Walk me through the last time..."
+- Any future hypothetical ("what if", "would you", "imagine if")
+- Any price / value / WTP / budget question
+
+REQUIRED PATTERNS (100% of questions must match at least one):
+- "Tell me about the last time..."
+- "Walk me through what happened when..."
+- "Think back to the last time..."
+- "What did you actually do when..."
+- "Describe a specific moment when..."
+
+FIELD CHECK:
 - Every question must have valid section, intent, report_bucket, id fields
+- No intent from the Session 2+ list (decision_process, value_perception, budget_signal, wtp_probe)
 - follow_up_hint: 2~3 per question, each probing deeper into the specific story
 - No duplicate themes across questions
+- Zero solution mentions

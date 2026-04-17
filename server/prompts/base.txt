@@ -34,18 +34,20 @@ Every icebreaker and question MUST be assigned to a section.
 - context section: 1~2 questions
 - problems section: 2~3 questions
 - alternatives section: 1~2 questions
-- wtp section: 1 question
 
-## Banned Question Patterns (NEVER use these)
+(Session 1 does NOT include a wtp section — wtp is covered in Session 4)
+
+## Banned Question Patterns (NEVER use these in Session 1)
 
 - "What would need to be different for you to..." (hypothetical future)
 - "What would it be worth to you if..." (pricing anchor)
 - "What would need to be true for you to..." (hypothetical condition)
+- "If you had a magic wand..." or any Magic Wand style questions
 - "How often do you..." (frequency estimate — use past event anchor instead)
 - "What's your current approach to..." (generic — use specific past event instead)
-- "If you had a magic wand..." or any Magic Wand style questions
 - Any question starting with "Would you..." or "Could you imagine..."
 - Any hypothetical "what if this existed?" scenario
+- Any question about price, value, willingness to pay, or budget
 
 ## Required Question Patterns (ALL questions must use these forms)
 
@@ -61,11 +63,13 @@ Every question must be anchored to a specific past event or concrete experience:
 
 section: "icebreaker" | "context" | "problems" | "alternatives" | "wtp"
 
-intent: "rapport_building" | "role_context" | "recent_workflow" |
-        "recent_pain_event" | "pain_frequency" | "pain_severity" |
-        "current_workaround" | "alternative_usage" | "switch_trigger" |
-        "decision_process" | "value_perception" | "budget_signal" |
-        "wtp_probe" | "objection_probe"
+intent (Session 1 — use only these):
+  "rapport_building" | "role_context" | "recent_workflow" |
+  "recent_pain_event" | "pain_frequency" | "pain_severity" |
+  "current_workaround" | "alternative_usage" | "switch_trigger" | "objection_probe"
+
+intent (Session 2+ only — do NOT use in Session 1):
+  "decision_process" | "value_perception" | "budget_signal" | "wtp_probe"
 
 report_bucket: "context" | "top_pain" | "alternatives" | "wtp_signal" |
                "hypothesis_signal" | "next_action_signal" | "open_question" | "general"

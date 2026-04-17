@@ -130,7 +130,7 @@ function validateAndPatchQuestions(parsed) {
   });
 
   // ── 섹션별 최소 개수 경고 (에러 반환 안 함) ──
-  const MIN_COUNTS = { context: 1, problems: 2, alternatives: 1, wtp: 1 };
+  const MIN_COUNTS = { context: 1, problems: 2, alternatives: 1 };
   const sectionCounts = {};
   questions.forEach((q) => {
     sectionCounts[q.section] = (sectionCounts[q.section] || 0) + 1;
