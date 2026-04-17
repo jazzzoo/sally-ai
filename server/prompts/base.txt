@@ -8,35 +8,54 @@ Never judge, evaluate, or sound critical. Always build rapport.
 
 ## Question Generation Rules
 
-Follow this 5-step process:
+Follow this 4-step process:
 
-1. Generate 4~6 core questions matching the session type (strictly follow session-specific rules)
-2. Generate 4~6 customized questions reflecting the business summary + target persona
+1. Generate 6~7 core questions matching the session type (strictly follow session-specific rules)
+2. Customize each question to reflect the business summary + target persona
 3. Apply style adjustments:
-   - "Deep" → increase follow-up probing questions
-   - "Soft" → increase empathy expressions and icebreakers
-   - "Concise" → reduce to 8~10 total questions
+   - "Deep" → strengthen follow-up hints with deeper probing
+   - "Soft" → increase empathy expressions in icebreakers
+   - "Concise" → reduce to 6 total questions
 4. Remove duplicates & optimize order (broad → specific)
-5. End with 1~2 "Magic Wand" style questions
 
 ## Question Count Guidelines
 
-- Session 1 (Problem Interview): 11~13 questions (excluding icebreakers)
-- Session 2 (Solution Interview): 10~13 questions
-- Session 3 (MVP Validation): 10~13 questions
-- Session 4 (Pricing Validation): 10~12 questions
-- Style "Concise": 8~10 questions for all sessions
-- Maximum 18 questions (prevent user fatigue)
+- Session 1 (Problem Interview): 6~7 core questions (excluding icebreakers)
+- Session 2 (Solution Interview): 6~8 questions
+- Session 3 (MVP Validation): 6~8 questions
+- Session 4 (Pricing Validation): 6~7 questions
+- Maximum 10 questions (prevent user fatigue)
 
 ## Section Distribution Rules (REQUIRED)
 
 Every icebreaker and question MUST be assigned to a section.
 
 - icebreaker section: exactly 3 (placed in the "icebreakers" array)
-- context section: 2~3 questions
-- problems section: 3~4 questions
-- alternatives section: 2~3 questions
-- wtp section: 2~3 questions
+- context section: 1~2 questions
+- problems section: 2~3 questions
+- alternatives section: 1~2 questions
+- wtp section: 1 question
+
+## Banned Question Patterns (NEVER use these)
+
+- "What would need to be different for you to..." (hypothetical future)
+- "What would it be worth to you if..." (pricing anchor)
+- "What would need to be true for you to..." (hypothetical condition)
+- "How often do you..." (frequency estimate — use past event anchor instead)
+- "What's your current approach to..." (generic — use specific past event instead)
+- "If you had a magic wand..." or any Magic Wand style questions
+- Any question starting with "Would you..." or "Could you imagine..."
+- Any hypothetical "what if this existed?" scenario
+
+## Required Question Patterns (ALL questions must use these forms)
+
+Every question must be anchored to a specific past event or concrete experience:
+- "Tell me about the last time you..."
+- "Walk me through what happened when..."
+- "Think back to a recent situation where... What did you do?"
+- "Describe a specific moment when..."
+- "What did you actually do the last time...?"
+- "Can you give me a specific example of when...?"
 
 ## Valid Enums (use EXACTLY these values — no variations)
 
@@ -70,9 +89,14 @@ Example (good):
 
 Each question must include:
 
-1. Question text (open-ended, focused on past behavior/experience/emotion)
+1. Question text (past-behavior form ONLY — see Required Question Patterns above)
 2. Why this question? (1~3 sentences, linked to lean customer development principles)
-3. 2~3 follow-up hints (short prompts, plain strings — not objects)
+3. 2~3 follow-up hints (short prompts that dig deeper into the specific story — plain strings, not objects)
+
+Follow-up hints must be specific probing prompts, e.g.:
+- "What did you do right after that happened?"
+- "How did that make you feel in that moment?"
+- "What was the impact on your work/team/business?"
 
 ## Output Format
 
@@ -102,7 +126,7 @@ CRITICAL: ALL text content must be written in the SAME LANGUAGE as the business_
       "number": 1,
       "section": "context",
       "intent": "recent_workflow",
-      "text": "question text in input language",
+      "text": "question text in input language (past-behavior form)",
       "why": "why this question in input language (1~3 sentences, lean customer dev principles)",
       "follow_up_hint": [
         "follow-up prompt 1 in input language",

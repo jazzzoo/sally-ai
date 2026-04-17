@@ -2,16 +2,16 @@ Session: 1 - Problem Interview
 
 Rules you MUST follow without exception:
 - NEVER mention any solution, product, feature, idea, or future possibility.
-- ONLY talk about current problems, past experiences, frustrations, and workarounds.
-- All questions MUST be open-ended, non-leading, focused on past behavior or current reality.
-- No yes/no questions. No hypothetical "would you" questions.
-- Prioritize revealing: emotional impact, time/money lost, frequency, current coping methods.
+- ONLY talk about past experiences, specific events, and what actually happened.
+- ALL questions MUST be anchored to a specific past event ("Tell me about the last time...")
+- No yes/no questions. No hypothetical "would you" questions. No frequency estimates.
+- Prioritize revealing: what they actually did, emotional impact, real consequences.
 
 ---
 
 ## Session 1 Purpose
 Validate whether the customer actually experiences this problem and how severe it is.
-The goal is to confirm or disprove the founder's hypothesis.
+The goal is to confirm or disprove the founder's hypothesis through real stories, not opinions.
 
 ## Strictly Prohibited
 - Never mention solutions, products, features, or ideas
@@ -20,46 +20,49 @@ The goal is to confirm or disprove the founder's hypothesis.
 - No MVP or prototype questions (covered in Session 3)
 - No leading questions like "Wasn't that inconvenient?"
 - No closed yes/no questions
-
-## Required Exploration Areas
-1. Current behavior patterns: How does the customer handle this problem now?
-2. Frequency and intensity: How often and how severely?
-3. Current alternatives: What methods/tools/services are they using?
-4. Limitations of alternatives: What's unsatisfying about current solutions?
-5. Consequences: What actual losses (time/money/emotion) does this problem cause?
+- No "How often do you..." (use past event anchor instead)
+- No "What would need to be different..." or Magic Wand questions
+- No "What would it be worth..." questions
 
 ## Section-Intent Assignment (REQUIRED — assign section + intent to every question)
 
-context section (2~3 questions):
+context section (1~2 questions):
   - intent options: "recent_workflow", "role_context"
-  - Goal: understand current situation, role, and daily workflow before exploring problems
+  - Goal: understand their current situation through a real recent example
+  - Example questions (adapt to the specific persona/business):
+    - recent_workflow: "Walk me through what your typical [task] looked like last week — what did you actually do, step by step?"
+    - role_context: "Tell me about a recent project where [relevant context] came up. What was your role and what did you have to deal with?"
 
-problems section (3~4 questions):
-  - intent options: "recent_pain_event", "pain_frequency", "pain_severity"
-  - Goal: identify specific pain points, how often they happen, and their emotional/financial impact
+problems section (2~3 questions):
+  - intent options: "recent_pain_event", "pain_severity"
+  - Goal: surface a specific painful moment and its real consequences
+  - Example questions (adapt to the specific persona/business):
+    - recent_pain_event: "Tell me about the last time [relevant problem] happened. What exactly went wrong?"
+    - pain_severity: "Walk me through what happened after that — what did you have to do to deal with it, and what did it cost you?"
 
-alternatives section (2~3 questions):
-  - intent options: "current_workaround", "alternative_usage", "switch_trigger"
-  - Goal: understand what solutions they currently use and why those fall short
+alternatives section (1~2 questions):
+  - intent options: "current_workaround", "switch_trigger"
+  - Goal: understand what they actually tried and why it wasn't enough
+  - Example questions (adapt to the specific persona/business):
+    - current_workaround: "What did you actually do to handle that situation? Walk me through the steps you took."
+    - switch_trigger: "Describe the moment you realized your current approach wasn't working. What happened right before that?"
 
-wtp section (2~3 questions):
-  - intent options: "wtp_probe", "budget_signal", "value_perception"
-  - Goal: explore implicit willingness to invest in a better solution (no pricing anchors)
-
-## Required Comment Elements
-Each question's "why" field must include:
-- Connection to lean customer development principles
-- Expected pain intensity criteria
-- Empathy reaction example (e.g. "That must have been really hard, could you tell me more?")
+wtp section (1 question):
+  - intent options: "switch_trigger"
+  - Goal: reveal the emotional tipping point — what made them desperate enough to change
+  - Example questions (adapt to the specific persona/business):
+    - switch_trigger: "Tell me about the moment when you thought 'I can't keep doing this the same way.' What had just happened?"
 
 ## Quality Validation
 After generating, self-verify:
+- Total questions: 6~7 (excluding icebreakers)
 - Zero solution mentions (fix immediately if violated)
-- At least 3 "why" questions in follow-ups
-- 70%+ of questions request specific examples/timeframes
-- context: ≥2 questions with section="context"
-- problems: ≥3 questions with section="problems"
-- alternatives: ≥2 questions with section="alternatives"
-- wtp: ≥2 questions with section="wtp"
+- Zero hypothetical or future-oriented questions (fix immediately if violated)
+- 100% of questions use past-behavior anchor forms ("Tell me about...", "Walk me through...", "Describe a specific...")
+- context: ≥1 question with section="context"
+- problems: ≥2 questions with section="problems"
+- alternatives: ≥1 question with section="alternatives"
+- wtp: ≥1 question with section="wtp"
 - Every question must have valid section, intent, report_bucket, id fields
-- No duplicate themes (failure/emotion)
+- follow_up_hint: 2~3 per question, each probing deeper into the specific story
+- No duplicate themes across questions
