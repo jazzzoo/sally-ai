@@ -144,6 +144,21 @@ async function buildSectionSummary(interviewSessionId, section) {
 }
 
 // ─────────────────────────────────────────────────────────────────
+// 섹션별 topics 추출 헬퍼
+// section 태그 있으면 필터링, 없으면 전체 반환 (구버전 호환)
+// ─────────────────────────────────────────────────────────────────
+function getSectionTopics(questionList, section) {
+  const all = [
+    ...(questionList.icebreakers || []),
+    ...(questionList.questions   || []),
+  ];
+  const filtered = all.filter((q) => q.section === section);
+  if (filtered.length > 0) return filtered;
+  console.warn(`[Interview] No topics found for section=${section}, using all`);
+  return all;
+}
+
+// ─────────────────────────────────────────────────────────────────
 // 프롬프트 조립
 // ─────────────────────────────────────────────────────────────────
 function buildSystemPrompt({ section, businessContext, keyTopics, completedSections, followupCount, maxFollowups }) {
@@ -156,7 +171,13 @@ function buildSystemPrompt({ section, businessContext, keyTopics, completedSecti
 
   const topicsText =
     keyTopics.length > 0
-      ? keyTopics.map((q, i) => `  ${i + 1}. ${q.text || String(q)}`).join('\n')
+      ? keyTopics.map((q, i) => {
+          const label = q.intent ? `[${q.intent}] ` : '';
+          const hints = q.follow_up_hint?.length
+            ? `\n     Hints: ${q.follow_up_hint.slice(0, 2).join(' / ')}`
+            : '';
+          return `  ${i + 1}. ${label}${q.text || String(q)}${hints}`;
+        }).join('\n')
       : '  (No specific topics — use your judgment based on the business context.)';
 
   const SECTION_COMPLETION_CRITERIA = {
@@ -602,15 +623,11 @@ router.post('/:token/start', async (req, res) => {
 
     // icebreaker 첫 인사 생성
     const businessContext = session.input_context?.business_summary || '';
-    const allTopics = [
-      ...(session.question_list.icebreakers || []),
-      ...(session.question_list.questions   || []),
-    ];
 
     const greetingPrompt = buildSystemPrompt({
       section:          'icebreaker',
       businessContext,
-      keyTopics:        allTopics,
+      keyTopics:        getSectionTopics(session.question_list, 'icebreaker'),
       completedSections: [],
       followupCount:    0,
       maxFollowups:     SECTION_CONFIG.icebreaker.maxFollowups,
@@ -821,10 +838,6 @@ router.post('/:token/chat', async (req, res) => {
 
     // ── AI 결정 + 응답 생성 (트랜잭션 외부) ────────────────────────
     const businessContext = session.input_context?.business_summary || '';
-    const allTopics = [
-      ...(session.question_list.icebreakers || []),
-      ...(session.question_list.questions   || []),
-    ];
     const completedSections = Array.isArray(state.completed_sections)
       ? state.completed_sections
       : [];
@@ -849,7 +862,7 @@ router.post('/:token/chat', async (req, res) => {
       const systemPrompt = buildSystemPrompt({
         section:          state.current_section,
         businessContext,
-        keyTopics:        allTopics,
+        keyTopics:        getSectionTopics(session.question_list, state.current_section),
         completedSections,
         followupCount:    state.followup_count || 0,
         maxFollowups:     SECTION_CONFIG[state.current_section]?.maxFollowups ?? 0,
@@ -870,7 +883,7 @@ router.post('/:token/chat', async (req, res) => {
         const nextSystemPrompt = buildSystemPrompt({
           section:          decision.nextSection,
           businessContext,
-          keyTopics:        allTopics,
+          keyTopics:        getSectionTopics(session.question_list, decision.nextSection),
           completedSections: updatedCompletedSections,
           followupCount:    0,
           maxFollowups:     SECTION_CONFIG[decision.nextSection]?.maxFollowups ?? 0,
