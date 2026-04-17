@@ -20,11 +20,11 @@ const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 const SECTION_ORDER = ['icebreaker', 'context', 'problems', 'alternatives', 'wtp'];
 
 const SECTION_CONFIG = {
-  icebreaker:   { minTurns: 2, maxFollowups: 0, hard_max_turns: 6  },
-  context:      { minTurns: 2, maxFollowups: 1, hard_max_turns: 8  },
-  problems:     { minTurns: 3, maxFollowups: 2, hard_max_turns: 12 },
-  alternatives: { minTurns: 2, maxFollowups: 1, hard_max_turns: 8  },
-  wtp:          { minTurns: 2, maxFollowups: 2, hard_max_turns: 10 },
+  icebreaker:   { minTurns: 2, maxFollowups: 0, hard_max_turns: 4  },
+  context:      { minTurns: 2, maxFollowups: 1, hard_max_turns: 5  },
+  problems:     { minTurns: 2, maxFollowups: 1, hard_max_turns: 7  },
+  alternatives: { minTurns: 2, maxFollowups: 1, hard_max_turns: 5  },
+  wtp:          { minTurns: 2, maxFollowups: 1, hard_max_turns: 5  },
 };
 
 const SECTION_GOALS = {
@@ -162,7 +162,7 @@ function getSectionTopics(questionList, section) {
 // ─────────────────────────────────────────────────────────────────
 // 프롬프트 조립
 // ─────────────────────────────────────────────────────────────────
-function buildSystemPrompt({ section, businessContext, keyTopics, completedSections, followupCount, maxFollowups, sessionType }) {
+function buildSystemPrompt({ section, businessContext, keyTopics, completedSections, followupCount, maxFollowups, sessionType, questionIndex = 0, totalQuestions = 0 }) {
   const prevText =
     completedSections.length > 0
       ? completedSections
@@ -170,17 +170,25 @@ function buildSystemPrompt({ section, businessContext, keyTopics, completedSecti
           .join('\n\n')
       : 'No previous sections completed yet.';
 
-  const topicsText =
-    keyTopics.length > 0
-      ? keyTopics.map((q, i) => {
-          const hints = q.follow_up_hint?.length
-            ? q.follow_up_hint.slice(0, 2)
-                .map((h, hi) => `     ${hi === 0 ? '→ If answer is short, probe:' : '→ Or dig deeper:'} ${h}`)
-                .join('\n')
-            : '';
-          return `Q${i + 1}: ${q.text || String(q)}${hints ? '\n' + hints : ''}`;
-        }).join('\n\n')
-      : '  (No specific topics — use your judgment based on the business context.)';
+  const topicsText = (() => {
+    if (keyTopics.length === 0) return '  (No specific topics — use your judgment based on the business context.)';
+    const currentQ = keyTopics[questionIndex] || keyTopics[0];
+    const hints = currentQ.follow_up_hint?.length
+      ? '\n' + currentQ.follow_up_hint.slice(0, 2)
+          .map((h, hi) => `  ${hi === 0 ? '→ If short answer, probe:' : '→ Or dig deeper:'} ${h}`)
+          .join('\n')
+      : '';
+    const currentBlock = `[CURRENT QUESTION — Ask this now]\nQ${questionIndex + 1} of ${totalQuestions}: ${currentQ.text || String(currentQ)}${hints}`;
+    const remaining = keyTopics.slice(questionIndex + 1);
+    const remainingBlock = remaining.length > 0
+      ? '\n\n[REMAINING QUESTIONS — Cover these next, in order]\n' +
+        remaining.map((q, i) => {
+          const text = q.text || String(q);
+          return `Q${questionIndex + 2 + i}: ${text.length > 60 ? text.slice(0, 57) + '...' : text}`;
+        }).join('\n')
+      : '';
+    return currentBlock + remainingBlock;
+  })();
 
   const SECTION_COMPLETION_CRITERIA = {
     icebreaker: `Set section_complete_candidate=true when:
@@ -193,9 +201,9 @@ Do NOT keep this section going unnecessarily. If the above conditions are mostly
 - You know what tools or methods they currently use
 - At least 2 substantive answers received`,
     problems: `Set section_complete_candidate=true when:
-- At least 2-3 specific pain points identified
-- You have some sense of frequency or impact
-- Further questions would be repetitive`,
+- You have asked the current guide question (Q${questionIndex + 1} of ${totalQuestions}) and received a substantive answer
+- This is the last question in the section, OR answers are becoming repetitive
+- Guide questions are exhausted — do NOT keep asking if all are covered`,
     alternatives: `Set section_complete_candidate=true when:
 - You know what solutions they currently use
 - You have some sense of their dissatisfaction`,
@@ -220,18 +228,13 @@ The respondent is a potential customer. Listen carefully and ask one thoughtful 
 [BUSINESS CONTEXT]
 ${businessContext}
 
-[INTERVIEW GUIDE — follow this closely]
-You have been given pre-designed interview questions for this section. Use them as your primary guide.
-
-Current section questions:
+[INTERVIEW GUIDE]
 ${topicsText}
 
-For each question:
-- Use the question text as your actual question (adapt naturally, don't read verbatim)
-- If the respondent gives a short answer, use the follow-up probes listed to dig deeper
-- Move to the next question only when the current one has been sufficiently explored
-DO NOT invent new questions outside this guide.
-DO NOT skip to solutions or pricing.
+- Ask the CURRENT QUESTION now. Do not skip ahead or invent new questions.
+- Use follow-up probes only if the answer is too short or vague (max 1 follow-up per question).
+- Once the current question is answered, move to the next in the list.
+DO NOT revisit topics already covered. DO NOT invent questions outside this guide.
 
 [CURRENT SECTION: ${section.toUpperCase()}]
 Goal: ${SECTION_GOALS[section] || ''}
@@ -244,11 +247,15 @@ ${session1Rules}
 - Briefly acknowledge the respondent's last answer before your question (1 short sentence max)
 - Avoid hollow affirmations: no "Great!", "Interesting!", "Awesome!" — use genuine acknowledgment or nothing
 - If this is a follow-up, dig deeper into what they just said; do not change topic
+- NEVER ask a question semantically similar to one already asked in this section
+- Maximum 1 follow-up per guide question — after the follow-up, move to the next guide question
+- If the guide question has been sufficiently answered, move on even if you could probe further
 
 [PREVIOUS SECTIONS — KEY FINDINGS]
 ${prevText}
 
 [CURRENT STATE]
+Current question: Q${questionIndex + 1} of ${totalQuestions}
 Follow-ups used on current question: ${followupCount}/${maxFollowups}
 
 [SECTION COMPLETION CRITERIA]
@@ -333,7 +340,7 @@ async function callClaudeForTurn(systemPrompt, recentTurns, retryCount = 0) {
 // ─────────────────────────────────────────────────────────────────
 // 서버 의사결정 (Claude 힌트 참조하되 서버가 최종 결정)
 // ─────────────────────────────────────────────────────────────────
-function makeServerDecision(state, claudeResult, wordCount, sessionType) {
+function makeServerDecision(state, claudeResult, wordCount, sessionType, totalQuestions) {
   const section = state.current_section;
   const config = SECTION_CONFIG[section];
 
@@ -346,18 +353,16 @@ function makeServerDecision(state, claudeResult, wordCount, sessionType) {
   // 이번 턴 포함한 섹션 내 누적 user 턴 수
   const candidateTurnCount = (state.section_turn_count || 0) + 1;
   const forceFollowup = wordCount < 15;
-  const canFollowup = (state.followup_count || 0) < config.maxFollowups;
+  const followupCount = state.followup_count || 0;
+  const canFollowup = followupCount < config.maxFollowups;
 
-  // hard_max_turns 초과 시 Claude 판단 무시하고 강제 전환
+  // hard_max_turns 초과 → 강제 섹션 전환
   const hardForce = candidateTurnCount >= config.hard_max_turns;
-
   if (hardForce) {
     console.log(`[Interview] hard_max_turns(${config.hard_max_turns}) reached in section=${section}, forcing transition`);
     const currentIdx = orderedSections.indexOf(section);
     const nextSection = orderedSections[currentIdx + 1];
-    return nextSection
-      ? { action: 'transition', nextSection }
-      : { action: 'wrap_up' };
+    return nextSection ? { action: 'transition', nextSection } : { action: 'wrap_up' };
   }
 
   // 1순위: followup (짧은 답변 강제 or Claude 판단)
@@ -365,21 +370,30 @@ function makeServerDecision(state, claudeResult, wordCount, sessionType) {
     return { action: 'followup' };
   }
 
-  // 2순위: 섹션 전환 (min_turns 충족 + Claude 완료 신호 OR maxFollowups 소진)
+  // 2순위: maxFollowups 소진 → 다음 질문으로 강제 이동 (Claude 판단 무시)
+  if (followupCount >= config.maxFollowups) {
+    const nextQuestionIdx = (state.question_index || 0) + 1;
+    if (nextQuestionIdx >= totalQuestions) {
+      // 마지막 질문까지 소진 → 섹션 전환
+      const currentIdx = orderedSections.indexOf(section);
+      const nextSection = orderedSections[currentIdx + 1];
+      return nextSection ? { action: 'transition', nextSection } : { action: 'wrap_up' };
+    }
+    return { action: 'next_question', questionIndex: nextQuestionIdx };
+  }
+
+  // 3순위: soft transition (Claude 완료 신호)
   const softTransition =
     candidateTurnCount >= config.minTurns &&
-    (state.followup_count >= config.maxFollowups || !claudeResult.needs_followup) &&
     claudeResult.section_complete_candidate;
 
   if (softTransition) {
     const currentIdx = orderedSections.indexOf(section);
     const nextSection = orderedSections[currentIdx + 1];
-    return nextSection
-      ? { action: 'transition', nextSection }
-      : { action: 'wrap_up' };
+    return nextSection ? { action: 'transition', nextSection } : { action: 'wrap_up' };
   }
 
-  // 3순위: 섹션 내 계속
+  // 4순위: 섹션 내 계속
   return { action: 'continue' };
 }
 
@@ -648,14 +662,17 @@ router.post('/:token/start', async (req, res) => {
     // icebreaker 첫 인사 생성
     const businessContext = session.input_context?.business_summary || '';
 
+    const icebreakerTopics = getSectionTopics(session.question_list, 'icebreaker');
     const greetingPrompt = buildSystemPrompt({
       section:          'icebreaker',
       businessContext,
-      keyTopics:        getSectionTopics(session.question_list, 'icebreaker'),
+      keyTopics:        icebreakerTopics,
       completedSections: [],
       followupCount:    0,
       maxFollowups:     SECTION_CONFIG.icebreaker.maxFollowups,
       sessionType:      session.session_type,
+      questionIndex:    0,
+      totalQuestions:   icebreakerTopics.length,
     });
 
     let greetingText = `Hi ${session.respondent_name}! Great to meet you. Could you start by telling me a bit about yourself and what you do?`;
@@ -884,14 +901,17 @@ router.post('/:token/chat', async (req, res) => {
 
     } else {
       // 1. 현재 섹션 context로 Claude 호출
+      const currentSectionTopics = getSectionTopics(session.question_list, state.current_section);
       const systemPrompt = buildSystemPrompt({
         section:          state.current_section,
         businessContext,
-        keyTopics:        getSectionTopics(session.question_list, state.current_section),
+        keyTopics:        currentSectionTopics,
         completedSections,
         followupCount:    state.followup_count || 0,
         maxFollowups:     SECTION_CONFIG[state.current_section]?.maxFollowups ?? 0,
         sessionType:      session.session_type,
+        questionIndex:    state.question_index || 0,
+        totalQuestions:   currentSectionTopics.length,
       });
 
       // user turn 저장 후 context 로드 (현재 user 턴 포함)
@@ -899,26 +919,47 @@ router.post('/:token/chat', async (req, res) => {
       const claudeResult = await callClaudeForTurn(systemPrompt, recentTurns);
 
       // 2. 서버 최종 결정
-      decision = makeServerDecision(state, claudeResult, wordCount, session.session_type);
+      decision = makeServerDecision(state, claudeResult, wordCount, session.session_type, currentSectionTopics.length);
 
       if (decision.action === 'transition') {
         // 전환: 현재 섹션 요약 생성 후 새 섹션 opening 질문 요청
         sectionSummaryForTransition = await buildSectionSummary(session.id, state.current_section);
         const updatedCompletedSections = [...completedSections, sectionSummaryForTransition];
 
+        const nextSectionTopics = getSectionTopics(session.question_list, decision.nextSection);
         const nextSystemPrompt = buildSystemPrompt({
-          section:          decision.nextSection,
+          section:           decision.nextSection,
           businessContext,
-          keyTopics:        getSectionTopics(session.question_list, decision.nextSection),
+          keyTopics:         nextSectionTopics,
           completedSections: updatedCompletedSections,
-          followupCount:    0,
-          maxFollowups:     SECTION_CONFIG[decision.nextSection]?.maxFollowups ?? 0,
-          sessionType:      session.session_type,
+          followupCount:     0,
+          maxFollowups:      SECTION_CONFIG[decision.nextSection]?.maxFollowups ?? 0,
+          sessionType:       session.session_type,
+          questionIndex:     0,
+          totalQuestions:    nextSectionTopics.length,
         });
 
         const nextResult = await callClaudeForTurn(nextSystemPrompt, recentTurns);
         assistantText = nextResult.next_question;
         finalSection = decision.nextSection;
+
+      } else if (decision.action === 'next_question') {
+        // followup 소진 → 다음 질문으로 강제 이동 (Claude 재호출)
+        const nextQTopics = getSectionTopics(session.question_list, state.current_section);
+        const nextQPrompt = buildSystemPrompt({
+          section:        state.current_section,
+          businessContext,
+          keyTopics:      nextQTopics,
+          completedSections,
+          followupCount:  0,
+          maxFollowups:   SECTION_CONFIG[state.current_section]?.maxFollowups ?? 0,
+          sessionType:    session.session_type,
+          questionIndex:  decision.questionIndex,
+          totalQuestions: nextQTopics.length,
+        });
+        const nextQResult = await callClaudeForTurn(nextQPrompt, recentTurns);
+        assistantText = nextQResult.next_question;
+        finalSection = state.current_section;
 
       } else if (decision.action === 'wrap_up') {
         assistantText = await generateWrapUpMessage(session.respondent_name, businessContext);
@@ -986,6 +1027,20 @@ router.post('/:token/chat', async (req, res) => {
                  updated_at             = NOW()
              WHERE interview_session_id = $4`,
             [candidateTurnCount, userTurnId, assistantTurnId, session.id]
+          );
+
+        } else if (decision.action === 'next_question') {
+          await dbClient.query(
+            `UPDATE interview_state
+             SET question_index         = $1,
+                 section_turn_count     = $2,
+                 followup_count         = 0,
+                 last_user_turn_id      = $3,
+                 last_assistant_turn_id = $4,
+                 state_version          = state_version + 1,
+                 updated_at             = NOW()
+             WHERE interview_session_id = $5`,
+            [decision.questionIndex, candidateTurnCount, userTurnId, assistantTurnId, session.id]
           );
 
         } else if (decision.action === 'transition') {
