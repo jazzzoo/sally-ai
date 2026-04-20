@@ -402,24 +402,89 @@ async function generateReport(interviewSessionId, businessContext) {
       .map((t) => `${t.role === 'assistant' ? 'Sally' : 'Respondent'} [${t.section}]: ${t.content}`)
       .join('\n\n');
 
-    const systemPrompt = `You are an expert customer development analyst.
-Analyze this interview transcript and produce a structured report.
-Output ONLY valid JSON matching this exact schema — no other text:
+    const systemPrompt = `You are an expert Lean Customer Development analyst trained in the Mom Test and Jobs-to-be-Done frameworks.
+This is a Session 1 Problem Interview transcript. Your job is to extract only what is evidenced in the transcript.
+
+LANGUAGE RULE: Detect the language of the business_context field. Output the entire report in that same language. Never mix languages.
+
+OUTPUT: Respond with ONLY valid JSON. No markdown, no explanation, no text outside the JSON.
+
+JSON SCHEMA:
 {
-  "hypothesis_verdict": "confirmed" | "mixed" | "rejected",
-  "top_pains": [{"title": "", "quote": "", "frequency": ""}],
-  "current_alternatives": [{"tool": "", "complaint": ""}],
-  "wtp_summary": "",
-  "next_actions": ["", "", ""],
-  "next_questions": ["", "", ""]
+  "problem_verdict": {
+    "status": "confirmed" | "mixed" | "rejected",
+    "evidence_level": "strong" | "medium" | "weak",
+    "reason": "1-2 sentence justification citing specific transcript evidence"
+  },
+  "respondent_context": {
+    "role": "respondent's role or job title as described in transcript",
+    "segment_fit": "high" | "medium" | "low",
+    "context_summary": "2-3 sentences describing the context in which they experience this problem"
+  },
+  "problem_situations": [
+    {
+      "trigger": "the specific situation or event that triggers the problem",
+      "job_context": "what the respondent was trying to accomplish at that moment",
+      "quote": "exact quote if available, otherwise empty string"
+    }
+  ],
+  "top_pains": [
+    {
+      "title": "pain label",
+      "description": "what exactly goes wrong",
+      "impact": "concrete cost: time / money / stress / delay",
+      "frequency": "how often this occurs, based on what they said",
+      "quote": "exact words from respondent, or empty string if none"
+    }
+  ],
+  "current_workarounds": [
+    {
+      "method": "what they currently do to cope",
+      "why_used": "why they chose this approach",
+      "complaint": "limitation or frustration with this approach"
+    }
+  ],
+  "consequences": [
+    {
+      "type": "time" | "stress" | "quality" | "money" | "delay",
+      "detail": "specific loss or consequence described",
+      "quote": "exact quote if available, otherwise empty string"
+    }
+  ],
+  "evidence_quotes": [
+    "most revealing quote 1",
+    "most revealing quote 2",
+    "most revealing quote 3"
+  ],
+  "next_actions": ["action 1", "action 2", "action 3"],
+  "next_questions": ["question 1", "question 2", "question 3"]
 }
-Rules:
-- hypothesis_verdict: "confirmed" if problem clearly exists and is painful, "rejected" if not, "mixed" otherwise
-- top_pains: max 3, ranked by severity. quote = exact words from respondent
-- current_alternatives: max 3 tools/methods they currently use
-- wtp_summary: 1-2 sentences summarizing willingness-to-pay signals
-- next_actions: 3 concrete things the founder should do next week
-- next_questions: 3 questions to ask in the next customer interview`;
+
+RULES — read carefully:
+
+1. SESSION SCOPE: This is a Problem Interview only. Do NOT extract or infer anything about solutions, features, pricing, willingness-to-pay, or product ideas. Those topics were not covered.
+
+2. EVIDENCE ONLY: Extract only past behaviors, recent specific events, actual workarounds, and concrete losses described by the respondent. Do not include opinions, compliments, or vague statements.
+
+3. QUOTES: Every key judgment must be backed by an exact quote from the transcript. If no quote exists for a field, use empty string "".
+
+4. evidence_level:
+   - "strong": specific incident + workaround + measurable consequence all present
+   - "medium": some elements present but not all three
+   - "weak": only vague mentions, no concrete story or consequence
+
+5. segment_fit:
+   - "high": problem is frequent, severe, and respondent has already tried to solve it
+   - "medium": problem exists but severity or frequency is low
+   - "low": problem is absent, minor, or respondent is not the target segment
+
+6. next_actions: prioritize "who to interview next" and "which hypothesis to validate" over any product suggestions.
+
+7. HALLUCINATION PREVENTION: If the transcript does not contain evidence for a field, output empty string "" or empty array []. Never invent content.
+
+8. top_pains: max 3, ranked by severity. current_workarounds: max 3. consequences: max 3. evidence_quotes: max 3. problem_situations: max 3.
+
+9. problem_situations: extract the specific trigger moment when the problem arises — "while doing X, Y happened". Focus on situational context ("what they were trying to do") and the triggering event. Leave as empty array [] if no concrete trigger is described in the transcript.`;
 
     let result = null;
     let lastError = null;
@@ -428,7 +493,7 @@ Rules:
       try {
         const response = await anthropic.messages.create({
           model: process.env.AI_MODEL_FALLBACK || 'claude-sonnet-4-6',
-          max_tokens: 1500,
+          max_tokens: 2000,
           system: systemPrompt,
           messages: [{
             role: 'user',

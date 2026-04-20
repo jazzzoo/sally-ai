@@ -15,7 +15,7 @@ export default function ReportScreen({ route, navigation }) {
   const [report, setReport]   = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState(null);
-  const pollRef  = useRef(null);
+  const pollRef    = useRef(null);
   const elapsedRef = useRef(0);
 
   async function fetchReport() {
@@ -79,7 +79,7 @@ export default function ReportScreen({ route, navigation }) {
   );
 }
 
-// ── Sub-components ─────────────────────────────────────────────
+// ── States ─────────────────────────────────────────────────────
 
 function LoadingState() {
   return (
@@ -96,16 +96,15 @@ function PendingState() {
       <ActivityIndicator size="large" color={colors.primaryMid} />
       <Text style={styles.loadingText}>Analyzing your interview...</Text>
       <Text style={styles.loadingSubtext}>This usually takes about 30 seconds.</Text>
-
       <View style={styles.skeletonSection}>
-        <View style={[styles.skeletonLine, { width: '60%', height: 20 }]} />
-        <View style={[styles.skeletonLine, { width: '90%' }]} />
-        <View style={[styles.skeletonLine, { width: '75%' }]} />
-      </View>
-      <View style={styles.skeletonSection}>
-        <View style={[styles.skeletonLine, { width: '50%', height: 20 }]} />
+        <View style={[styles.skeletonLine, { width: '55%', height: 18 }]} />
         <View style={[styles.skeletonLine, { width: '85%' }]} />
         <View style={[styles.skeletonLine, { width: '70%' }]} />
+      </View>
+      <View style={styles.skeletonSection}>
+        <View style={[styles.skeletonLine, { width: '45%', height: 18 }]} />
+        <View style={[styles.skeletonLine, { width: '90%' }]} />
+        <View style={[styles.skeletonLine, { width: '65%' }]} />
       </View>
     </View>
   );
@@ -121,61 +120,134 @@ function ErrorState({ message }) {
   );
 }
 
+// ── Completed Report ───────────────────────────────────────────
+
 function CompletedReport({ report }) {
   const r = report?.result || {};
-
-  const verdictConfig = {
-    confirmed: { label: 'Confirmed ✓', bg: '#E8F5E9', color: '#2E7D32' },
-    mixed:     { label: 'Mixed signals', bg: '#FFF8E1', color: '#F57C00' },
-    rejected:  { label: 'Not validated', bg: '#FFEBEE', color: '#C62828' },
-  };
-  const verdict = verdictConfig[r?.hypothesis_verdict] || verdictConfig.mixed;
 
   return (
     <View style={styles.reportContainer}>
       <Text style={styles.respondentName}>{report?.respondent_name || 'Anonymous'}</Text>
 
-      {/* Hypothesis Verdict */}
-      <Section title="Hypothesis">
-        <View style={[styles.verdictCard, { backgroundColor: verdict.bg }]}>
-          <Text style={[styles.verdictLabel, { color: verdict.color }]}>{verdict.label}</Text>
-        </View>
-      </Section>
+      {/* 1. Respondent Context */}
+      {r?.respondent_context && (
+        <Section title="Respondent">
+          <View style={styles.rowWrap}>
+            <Text style={styles.roleText}>{r.respondent_context?.role ?? ''}</Text>
+            {r.respondent_context?.segment_fit && (
+              <SegmentBadge fit={r.respondent_context.segment_fit} />
+            )}
+          </View>
+          {r.respondent_context?.context_summary ? (
+            <Text style={styles.bodyText}>{r.respondent_context.context_summary}</Text>
+          ) : null}
+        </Section>
+      )}
 
-      {/* Top Pains */}
+      {/* 2. Problem Situations */}
+      {(r?.problem_situations?.length ?? 0) > 0 && (
+        <Section title="Problem Situations">
+          {r.problem_situations.map((s, i) => (
+            <View key={i} style={styles.situationCard}>
+              <Text style={styles.situationTrigger}>{s?.trigger ?? ''}</Text>
+              {s?.job_context ? (
+                <Text style={styles.bodyText}>{s.job_context}</Text>
+              ) : null}
+              {s?.quote ? (
+                <Text style={styles.quote}>"{s.quote}"</Text>
+              ) : null}
+            </View>
+          ))}
+        </Section>
+      )}
+
+      {/* 3. Problem Verdict */}
+      {r?.problem_verdict && (
+        <Section title="Problem Verdict">
+          <View style={styles.verdictRow}>
+            <VerdictBadge status={r.problem_verdict?.status} />
+            {r.problem_verdict?.evidence_level && (
+              <EvidenceBadge level={r.problem_verdict.evidence_level} />
+            )}
+          </View>
+          {r.problem_verdict?.reason ? (
+            <Text style={styles.bodyText}>{r.problem_verdict.reason}</Text>
+          ) : null}
+        </Section>
+      )}
+
+      {/* 3. Top Pains */}
       {(r?.top_pains?.length ?? 0) > 0 && (
         <Section title="Top Pains">
           {r.top_pains.map((pain, i) => (
             <View key={i} style={styles.painCard}>
               <Text style={styles.painTitle}>{pain?.title ?? ''}</Text>
-              {pain?.quote ? <Text style={styles.painQuote}>"{pain.quote}"</Text> : null}
-              {pain?.frequency ? <Text style={styles.painFrequency}>{pain.frequency}</Text> : null}
+              {pain?.description ? (
+                <Text style={styles.bodyText}>{pain.description}</Text>
+              ) : null}
+              <View style={styles.metaRow}>
+                {pain?.impact ? (
+                  <Text style={styles.metaChip}>⚡ {pain.impact}</Text>
+                ) : null}
+                {pain?.frequency ? (
+                  <Text style={styles.metaChip}>↻ {pain.frequency}</Text>
+                ) : null}
+              </View>
+              {pain?.quote ? (
+                <Text style={styles.quote}>"{pain.quote}"</Text>
+              ) : null}
             </View>
           ))}
         </Section>
       )}
 
-      {/* Current Alternatives */}
-      {(r?.current_alternatives?.length ?? 0) > 0 && (
-        <Section title="Current Alternatives">
-          {r.current_alternatives.map((alt, i) => (
-            <View key={i} style={styles.altCard}>
-              <Text style={styles.altTool}>{alt?.tool ?? ''}</Text>
-              {alt?.complaint ? <Text style={styles.altComplaint}>{alt.complaint}</Text> : null}
+      {/* 4. Current Workarounds */}
+      {(r?.current_workarounds?.length ?? 0) > 0 && (
+        <Section title="Current Workarounds">
+          {r.current_workarounds.map((w, i) => (
+            <View key={i} style={styles.workaroundCard}>
+              <Text style={styles.workaroundMethod}>{w?.method ?? ''}</Text>
+              {w?.why_used ? (
+                <Text style={styles.bodyText}>{w.why_used}</Text>
+              ) : null}
+              {w?.complaint ? (
+                <Text style={styles.complaint}>✕ {w.complaint}</Text>
+              ) : null}
             </View>
           ))}
         </Section>
       )}
 
-      {/* WTP Summary — only shown if non-empty */}
-      {r?.wtp_summary ? (
-        <Section title="Willingness to Pay">
-          <Text style={styles.bodyText}>{r.wtp_summary}</Text>
+      {/* 5. Consequences */}
+      {(r?.consequences?.length ?? 0) > 0 && (
+        <Section title="Consequences">
+          {r.consequences.map((c, i) => (
+            <View key={i} style={styles.consequenceRow}>
+              {c?.type ? <ConsequenceTypeBadge type={c.type} /> : null}
+              <View style={{ flex: 1, gap: 4 }}>
+                {c?.detail ? (
+                  <Text style={styles.bodyText}>{c.detail}</Text>
+                ) : null}
+                {c?.quote ? (
+                  <Text style={styles.quote}>"{c.quote}"</Text>
+                ) : null}
+              </View>
+            </View>
+          ))}
         </Section>
-      ) : null}
+      )}
 
-      {/* Next Actions */}
-      {(r?.next_actions?.length ?? 0) > 0 && (
+      {/* 6. Evidence Quotes */}
+      {(r?.evidence_quotes?.filter(Boolean).length ?? 0) > 0 && (
+        <Section title="Key Quotes">
+          {r.evidence_quotes.filter(Boolean).map((q, i) => (
+            <Text key={i} style={styles.evidenceQuote}>"{q}"</Text>
+          ))}
+        </Section>
+      )}
+
+      {/* 7. Next Actions */}
+      {(r?.next_actions?.filter(Boolean).length ?? 0) > 0 && (
         <Section title="Next Actions">
           {r.next_actions.filter(Boolean).map((action, i) => (
             <View key={i} style={styles.listItem}>
@@ -186,8 +258,8 @@ function CompletedReport({ report }) {
         </Section>
       )}
 
-      {/* Next Questions */}
-      {(r?.next_questions?.length ?? 0) > 0 && (
+      {/* 8. Next Questions */}
+      {(r?.next_questions?.filter(Boolean).length ?? 0) > 0 && (
         <Section title="Questions to Explore Next">
           {r.next_questions.filter(Boolean).map((q, i) => (
             <View key={i} style={styles.listItem}>
@@ -197,6 +269,66 @@ function CompletedReport({ report }) {
           ))}
         </Section>
       )}
+    </View>
+  );
+}
+
+// ── Badge Components ───────────────────────────────────────────
+
+function VerdictBadge({ status }) {
+  const map = {
+    confirmed: { label: 'Confirmed ✓', bg: '#E8F5E9', color: '#2E7D32' },
+    mixed:     { label: 'Mixed',        bg: '#FFF8E1', color: '#F57C00' },
+    rejected:  { label: 'Not validated', bg: '#FFEBEE', color: '#C62828' },
+  };
+  const cfg = map[status] || map.mixed;
+  return (
+    <View style={[styles.badge, { backgroundColor: cfg.bg }]}>
+      <Text style={[styles.badgeText, { color: cfg.color }]}>{cfg.label}</Text>
+    </View>
+  );
+}
+
+function EvidenceBadge({ level }) {
+  const map = {
+    strong: { label: 'Strong evidence', bg: '#E3F2FD', color: '#1565C0' },
+    medium: { label: 'Medium evidence', bg: '#F3E5F5', color: '#6A1B9A' },
+    weak:   { label: 'Weak evidence',   bg: '#FAFAFA', color: '#757575' },
+  };
+  const cfg = map[level] || map.weak;
+  return (
+    <View style={[styles.badge, { backgroundColor: cfg.bg }]}>
+      <Text style={[styles.badgeText, { color: cfg.color }]}>{cfg.label}</Text>
+    </View>
+  );
+}
+
+function SegmentBadge({ fit }) {
+  const map = {
+    high:   { label: 'Target fit ↑', bg: '#E8F5E9', color: '#2E7D32' },
+    medium: { label: 'Partial fit',  bg: '#FFF8E1', color: '#F57C00' },
+    low:    { label: 'Low fit ↓',   bg: '#FFEBEE', color: '#C62828' },
+  };
+  const cfg = map[fit] || map.medium;
+  return (
+    <View style={[styles.badge, { backgroundColor: cfg.bg }]}>
+      <Text style={[styles.badgeText, { color: cfg.color }]}>{cfg.label}</Text>
+    </View>
+  );
+}
+
+function ConsequenceTypeBadge({ type }) {
+  const map = {
+    time:    { label: 'Time',    color: '#1565C0', bg: '#E3F2FD' },
+    stress:  { label: 'Stress',  color: '#6A1B9A', bg: '#F3E5F5' },
+    quality: { label: 'Quality', color: '#E65100', bg: '#FFF3E0' },
+    money:   { label: 'Money',   color: '#1B5E20', bg: '#E8F5E9' },
+    delay:   { label: 'Delay',   color: '#BF360C', bg: '#FBE9E7' },
+  };
+  const cfg = map[type] || { label: type, color: colors.textSecondary, bg: colors.border };
+  return (
+    <View style={[styles.typeBadge, { backgroundColor: cfg.bg }]}>
+      <Text style={[styles.badgeText, { color: cfg.color }]}>{cfg.label}</Text>
     </View>
   );
 }
@@ -214,6 +346,7 @@ function Section({ title, children }) {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.background },
+
   topBar: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -236,16 +369,16 @@ const styles = StyleSheet.create({
     width: '100%',
   },
 
+  // ── States
   centered: {
     alignItems: 'center',
     paddingTop: spacing.xl * 2,
     gap: spacing.sm,
   },
-  loadingText: { ...textStyles.body, color: colors.textSecondary, marginTop: spacing.md },
+  loadingText:    { ...textStyles.body,   color: colors.textSecondary, marginTop: spacing.md },
   loadingSubtext: { ...textStyles.caption, color: colors.textDisabled },
-
-  errorIcon: { fontSize: 32, color: colors.error },
-  errorTitle: { ...textStyles.h3, color: colors.textPrimary },
+  errorIcon:    { fontSize: 32, color: colors.error },
+  errorTitle:   { ...textStyles.h3,   color: colors.textPrimary },
   errorMessage: { ...textStyles.bodyS, color: colors.textSecondary, textAlign: 'center', paddingHorizontal: spacing.lg },
 
   skeletonSection: {
@@ -265,6 +398,7 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
 
+  // ── Report layout
   reportContainer: { gap: spacing.md },
   respondentName: { ...textStyles.h2, color: colors.textPrimary, marginBottom: spacing.xs },
 
@@ -284,33 +418,86 @@ const styles = StyleSheet.create({
     letterSpacing: 0.8,
   },
 
-  verdictCard: {
-    borderRadius: radius.sm,
-    padding: spacing.sm,
+  // ── Verdict
+  verdictRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
+  rowWrap:    { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, alignItems: 'center' },
+
+  // ── Badges
+  badge: {
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
     alignSelf: 'flex-start',
   },
-  verdictLabel: { fontSize: 15, fontWeight: '700' },
+  typeBadge: {
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    alignSelf: 'flex-start',
+    marginTop: 2,
+  },
+  badgeText: { fontSize: 11, fontWeight: '700' },
 
+  // ── Situation cards
+  situationCard: {
+    borderLeftWidth: 3,
+    borderLeftColor: colors.primaryMid,
+    paddingLeft: spacing.sm,
+    gap: 4,
+  },
+  situationTrigger: { ...textStyles.bodyS, color: colors.textPrimary, fontWeight: '700' },
+
+  // ── Pain cards
   painCard: {
     borderLeftWidth: 3,
     borderLeftColor: colors.primaryEnd,
     paddingLeft: spacing.sm,
+    gap: 6,
+  },
+  painTitle: { ...textStyles.bodyS, color: colors.textPrimary, fontWeight: '700' },
+  metaRow:   { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
+  metaChip:  { ...textStyles.caption, color: colors.textDisabled, backgroundColor: colors.background, borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 },
+
+  // ── Workaround cards
+  workaroundCard: {
+    borderLeftWidth: 3,
+    borderLeftColor: colors.primary,
+    paddingLeft: spacing.sm,
     gap: 4,
   },
-  painTitle: { ...textStyles.bodyS, color: colors.textPrimary, fontWeight: '600' },
-  painQuote: { ...textStyles.bodyS, color: colors.textSecondary, fontStyle: 'italic' },
-  painFrequency: { ...textStyles.caption, color: colors.textDisabled },
+  workaroundMethod: { ...textStyles.bodyS, color: colors.textPrimary, fontWeight: '700' },
+  complaint: { ...textStyles.bodyS, color: colors.primaryEnd, fontStyle: 'italic' },
 
-  altCard: {
+  // ── Consequence rows
+  consequenceRow: {
     flexDirection: 'row',
     gap: spacing.sm,
     alignItems: 'flex-start',
   },
-  altTool: { ...textStyles.bodyS, color: colors.primary, fontWeight: '600', minWidth: 80 },
-  altComplaint: { ...textStyles.bodyS, color: colors.textSecondary, flex: 1 },
 
+  // ── Evidence quotes
+  evidenceQuote: {
+    ...textStyles.bodyS,
+    color: colors.textSecondary,
+    fontStyle: 'italic',
+    borderLeftWidth: 2,
+    borderLeftColor: colors.primaryMid,
+    paddingLeft: spacing.sm,
+    lineHeight: 22,
+  },
+
+  // ── Shared text
   bodyText: { ...textStyles.bodyS, color: colors.textSecondary, lineHeight: 22 },
+  roleText: { ...textStyles.bodyS, color: colors.textPrimary, fontWeight: '600' },
+  quote: {
+    ...textStyles.bodyS,
+    color: colors.textSecondary,
+    fontStyle: 'italic',
+    lineHeight: 22,
+    marginTop: 2,
+  },
 
+  // ── Next actions / questions
   listItem: { flexDirection: 'row', gap: spacing.xs, alignItems: 'flex-start' },
   listBullet: { ...textStyles.bodyS, color: colors.primary, fontWeight: '600', minWidth: 20 },
   listText: { ...textStyles.bodyS, color: colors.textSecondary, flex: 1, lineHeight: 22 },
