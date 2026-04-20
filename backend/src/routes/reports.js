@@ -1,6 +1,6 @@
 import express from 'express';
 import { withRLS } from '../models/db.js';
-import authenticateGuest from '../middleware/authenticateGuest.js';
+import { authenticateGuest } from '../middleware/authenticateGuest.js';
 
 const router = express.Router();
 router.use(authenticateGuest);
