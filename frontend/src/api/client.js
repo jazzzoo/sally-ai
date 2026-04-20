@@ -231,6 +231,13 @@ export const interviewApi = {
   },
 };
 
+// 리포트 (창업자용 - 인증 필요)
+export const reportsApi = {
+  list: () => apiGet('/api/reports'),
+  get: (reportId) => apiGet(`/api/reports/${reportId}`),
+  status: (reportId) => apiGet(`/api/reports/${reportId}/status`),
+};
+
 // 헬스체크
 export const healthApi = {
   check: () => apiGet('/health'),

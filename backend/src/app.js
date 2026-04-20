@@ -6,6 +6,7 @@ import sessionsRouter from './routes/sessions.js';
 import questionListsRouter from './routes/questionLists.js';
 import interviewSessionsRouter from './routes/interviewSessions.js';
 import interviewRouter from './routes/interview.js';
+import reportsRouter from './routes/reports.js';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import rateLimit from 'express-rate-limit';
@@ -75,6 +76,7 @@ app.use('/api/sessions', sessionsRouter);
 app.use('/api/question-lists', questionListsRouter);
 app.use('/api/interview-sessions', interviewSessionsRouter); // 창업자용 링크 관리
 app.use('/api/interview', interviewRouter);                  // 응답자용 공개 채팅
+app.use('/api/reports', reportsRouter);                     // 리포트 조회
 
 // ─────────────────────────────────────────
 // 헬스체크

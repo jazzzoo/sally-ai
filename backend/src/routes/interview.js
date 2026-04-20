@@ -43,6 +43,17 @@ const SECTION_GOALS = {
 };
 
 // ─────────────────────────────────────────────────────────────────
+// 종료 신호 감지
+// ─────────────────────────────────────────────────────────────────
+function detectExitSignal(text) {
+  const t = text.trim();
+  if (/^(stop|quit|end|exit|bye|goodbye|done|finish)\.?$/i.test(t)) return 'hard_stop';
+  if (/need to (go|leave|run|jump)|can we wrap|running out of time|one (last|more) (question|thing)/i.test(t)) return 'soft_stop';
+  if (/how (much|long|many).*(longer|left|more|remain|take)|when (will|does|do).*(end|finish|over|done)|almost (done|over|finished)/i.test(t)) return 'time_check';
+  return null;
+}
+
+// ─────────────────────────────────────────────────────────────────
 // Rate limit (토큰 기반, 메모리)
 // ─────────────────────────────────────────────────────────────────
 const chatLimitMap = new Map();
@@ -171,46 +182,22 @@ function buildSystemPrompt({ section, businessContext, keyTopics, completedSecti
       : 'No previous sections completed yet.';
 
   const topicsText = (() => {
-    if (keyTopics.length === 0) return '  (No specific topics — use your judgment based on the business context.)';
+    if (keyTopics.length === 0) return '(No specific question available — use your judgment.)';
     const currentQ = keyTopics[questionIndex] || keyTopics[0];
-    const hints = currentQ.follow_up_hint?.length
-      ? '\n' + currentQ.follow_up_hint.slice(0, 2)
-          .map((h, hi) => `  ${hi === 0 ? '→ If short answer, probe:' : '→ Or dig deeper:'} ${h}`)
-          .join('\n')
-      : '';
-    const currentBlock = `[CURRENT QUESTION — Ask this now]\nQ${questionIndex + 1} of ${totalQuestions}: ${currentQ.text || String(currentQ)}${hints}`;
-    const remaining = keyTopics.slice(questionIndex + 1);
-    const remainingBlock = remaining.length > 0
-      ? '\n\n[REMAINING QUESTIONS — Cover these next, in order]\n' +
-        remaining.map((q, i) => {
-          const text = q.text || String(q);
-          return `Q${questionIndex + 2 + i}: ${text.length > 60 ? text.slice(0, 57) + '...' : text}`;
-        }).join('\n')
-      : '';
-    return currentBlock + remainingBlock;
-  })();
+    const hints = currentQ.follow_up_hint?.slice(0, 2) || [];
+    const probeLines = hints.length > 0
+      ? hints.map((h) => `- ${h}`).join('\n')
+      : '- Could you tell me a bit more about that?\n- What happened next?';
+    return `[YOUR ONLY JOB THIS TURN]
+Ask this question naturally (do NOT invent a new one):
+"${currentQ.text || String(currentQ)}"
 
-  const SECTION_COMPLETION_CRITERIA = {
-    icebreaker: `Set section_complete_candidate=true when:
-- You have asked at least 2 questions AND received answers
-- The respondent has described their role or situation
-- The conversation feels naturally warmed up
-Do NOT keep this section going unnecessarily. If the above conditions are mostly met, set true.`,
-    context: `Set section_complete_candidate=true when:
-- You understand their current workflow or situation
-- You know what tools or methods they currently use
-- At least 2 substantive answers received`,
-    problems: `Set section_complete_candidate=true when:
-- You have asked the current guide question (Q${questionIndex + 1} of ${totalQuestions}) and received a substantive answer
-- This is the last question in the section, OR answers are becoming repetitive
-- Guide questions are exhausted — do NOT keep asking if all are covered`,
-    alternatives: `Set section_complete_candidate=true when:
-- You know what solutions they currently use
-- You have some sense of their dissatisfaction`,
-    wtp: `Set section_complete_candidate=true when:
-- You have explored willingness to pay
-- You have some sense of budget or conditions`,
-  };
+If the answer is too short or vague, use ONE of these probes:
+${probeLines}
+
+When the question is sufficiently answered, output answered_current_question=true.
+DO NOT generate any other question.`;
+  })();
 
   const session1Rules = sessionType === 1 ? `
 [SESSION 1 RULES — CRITICAL, NO EXCEPTIONS]
@@ -223,62 +210,41 @@ Do NOT keep this section going unnecessarily. If the above conditions are mostly
 
   return `[ROLE]
 You are Sally, an expert customer development interviewer working on behalf of a non-native English founder.
-The respondent is a potential customer. Listen carefully and ask one thoughtful question at a time.
+The respondent is a potential customer. Listen carefully and follow the guide exactly.
 
 [BUSINESS CONTEXT]
 ${businessContext}
 
-[INTERVIEW GUIDE]
 ${topicsText}
-
-- Ask the CURRENT QUESTION now. Do not skip ahead or invent new questions.
-- Use follow-up probes only if the answer is too short or vague (max 1 follow-up per question).
-- Once the current question is answered, move to the next in the list.
-DO NOT revisit topics already covered. DO NOT invent questions outside this guide.
 
 [CURRENT SECTION: ${section.toUpperCase()}]
 Goal: ${SECTION_GOALS[section] || ''}
 ${session1Rules}
 [RULES]
-- Ask exactly ONE question per response
-- Use natural, simple conversational English
-- Never mention section names, interview structure, or transitions to the respondent
-- Do not repeat topics already covered in previous sections
-- Briefly acknowledge the respondent's last answer before your question (1 short sentence max)
-- Avoid hollow affirmations: no "Great!", "Interesting!", "Awesome!" — use genuine acknowledgment or nothing
-- If this is a follow-up, dig deeper into what they just said; do not change topic
+- Follow the guide question above — do NOT invent a different question
+- Use natural, conversational English; adapt the phrasing but keep the intent
+- Briefly acknowledge the respondent's last answer (1 short sentence max)
+- Avoid hollow affirmations: no "Great!", "Interesting!", "Awesome!"
 - NEVER ask a question semantically similar to one already asked in this section
-- Maximum 1 follow-up per guide question — after the follow-up, move to the next guide question
-- If the guide question has been sufficiently answered, move on even if you could probe further
 
 [PREVIOUS SECTIONS — KEY FINDINGS]
 ${prevText}
 
 [CURRENT STATE]
-Current question: Q${questionIndex + 1} of ${totalQuestions}
-Follow-ups used on current question: ${followupCount}/${maxFollowups}
-
-[SECTION COMPLETION CRITERIA]
-${SECTION_COMPLETION_CRITERIA[section] || 'Set section_complete_candidate=true when the section goals are sufficiently met.'}
-
-IMPORTANT: Do not always return section_complete_candidate=false.
-If the section goals are mostly met, return true. It is better to move forward than to repeat questions.
-
-[FOLLOW-UP CRITERIA]
-Set needs_followup=true ONLY when:
-- Answer is very short (under 10 words)
-- Answer is too vague to understand their situation
-- A critical detail is completely missing
-Otherwise set needs_followup=false.
+Question: Q${questionIndex + 1} of ${totalQuestions} in this section
+Probes used: ${followupCount}/${maxFollowups}
 
 [OUTPUT — RESPOND WITH JSON ONLY, NO OTHER TEXT]
 {
-  "next_question": "The exact English question to send to the respondent",
-  "needs_followup": false,
-  "followup_reason": "",
-  "section_complete_candidate": false,
-  "section_completion_reason": ""
-}`;
+  "utterance": "Sally's exact words to send to the respondent",
+  "answered_current_question": false,
+  "needs_probe": false,
+  "detected_exit_signal": "none"
+}
+
+answered_current_question: true if the respondent gave a substantive answer to the current question
+needs_probe: true ONLY if the answer was under 10 words or completely vague
+detected_exit_signal: "none" | "time_check" (asking how long left) | "soft_stop" (needs to leave soon) | "hard_stop" (stopping now)`;
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -310,16 +276,15 @@ async function callClaudeForTurn(systemPrompt, recentTurns, retryCount = 0) {
       .trim();
 
     const parsed = JSON.parse(cleaned);
-    if (!parsed.next_question || typeof parsed.next_question !== 'string') {
-      throw new Error('Invalid JSON: missing next_question');
+    if (!parsed.utterance || typeof parsed.utterance !== 'string') {
+      throw new Error('Invalid JSON: missing utterance');
     }
 
     return {
-      next_question:             parsed.next_question.trim(),
-      needs_followup:            Boolean(parsed.needs_followup),
-      followup_reason:           String(parsed.followup_reason || ''),
-      section_complete_candidate: Boolean(parsed.section_complete_candidate),
-      section_completion_reason: String(parsed.section_completion_reason || ''),
+      utterance:                 parsed.utterance.trim(),
+      answered_current_question: Boolean(parsed.answered_current_question),
+      needs_probe:               Boolean(parsed.needs_probe),
+      detected_exit_signal:      String(parsed.detected_exit_signal || 'none'),
     };
   } catch (err) {
     if (retryCount < 1) {
@@ -328,11 +293,10 @@ async function callClaudeForTurn(systemPrompt, recentTurns, retryCount = 0) {
     }
     console.error('[Interview] Claude failed after retry:', err.message);
     return {
-      next_question:             'Could you tell me a bit more about that?',
-      needs_followup:            true,
-      followup_reason:           'api_error',
-      section_complete_candidate: false,
-      section_completion_reason: '',
+      utterance:                 'Could you tell me a bit more about that?',
+      answered_current_question: false,
+      needs_probe:               true,
+      detected_exit_signal:      'none',
     };
   }
 }
@@ -350,31 +314,28 @@ function makeServerDecision(state, claudeResult, wordCount, sessionType, totalQu
     ? SECTION_ORDER.filter((s) => s !== 'wtp')
     : SECTION_ORDER;
 
-  // 이번 턴 포함한 섹션 내 누적 user 턴 수
   const candidateTurnCount = (state.section_turn_count || 0) + 1;
-  const forceFollowup = wordCount < 15;
   const followupCount = state.followup_count || 0;
   const canFollowup = followupCount < config.maxFollowups;
+  const forceProbe = wordCount < 15;
 
-  // hard_max_turns 초과 → 강제 섹션 전환
-  const hardForce = candidateTurnCount >= config.hard_max_turns;
-  if (hardForce) {
+  // hard_max_turns → 강제 섹션 전환
+  if (candidateTurnCount >= config.hard_max_turns) {
     console.log(`[Interview] hard_max_turns(${config.hard_max_turns}) reached in section=${section}, forcing transition`);
     const currentIdx = orderedSections.indexOf(section);
     const nextSection = orderedSections[currentIdx + 1];
     return nextSection ? { action: 'transition', nextSection } : { action: 'wrap_up' };
   }
 
-  // 1순위: followup (짧은 답변 강제 or Claude 판단)
-  if ((forceFollowup || claudeResult.needs_followup) && canFollowup) {
+  // 1순위: probe (짧은 답변 강제 or Claude 판단)
+  if ((forceProbe || claudeResult.needs_probe) && canFollowup) {
     return { action: 'followup' };
   }
 
-  // 2순위: maxFollowups 소진 → 다음 질문으로 강제 이동 (Claude 판단 무시)
+  // 2순위: followup 소진 → 강제 다음 질문 이동
   if (followupCount >= config.maxFollowups) {
     const nextQuestionIdx = (state.question_index || 0) + 1;
     if (nextQuestionIdx >= totalQuestions) {
-      // 마지막 질문까지 소진 → 섹션 전환
       const currentIdx = orderedSections.indexOf(section);
       const nextSection = orderedSections[currentIdx + 1];
       return nextSection ? { action: 'transition', nextSection } : { action: 'wrap_up' };
@@ -382,18 +343,18 @@ function makeServerDecision(state, claudeResult, wordCount, sessionType, totalQu
     return { action: 'next_question', questionIndex: nextQuestionIdx };
   }
 
-  // 3순위: soft transition (Claude 완료 신호)
-  const softTransition =
-    candidateTurnCount >= config.minTurns &&
-    claudeResult.section_complete_candidate;
-
-  if (softTransition) {
-    const currentIdx = orderedSections.indexOf(section);
-    const nextSection = orderedSections[currentIdx + 1];
-    return nextSection ? { action: 'transition', nextSection } : { action: 'wrap_up' };
+  // 3순위: Claude가 질문 답변 완료 판단 → 다음 질문
+  if (claudeResult.answered_current_question) {
+    const nextQuestionIdx = (state.question_index || 0) + 1;
+    if (nextQuestionIdx >= totalQuestions) {
+      const currentIdx = orderedSections.indexOf(section);
+      const nextSection = orderedSections[currentIdx + 1];
+      return nextSection ? { action: 'transition', nextSection } : { action: 'wrap_up' };
+    }
+    return { action: 'next_question', questionIndex: nextQuestionIdx };
   }
 
-  // 4순위: 섹션 내 계속
+  // 4순위: 같은 질문 계속
   return { action: 'continue' };
 }
 
@@ -686,7 +647,7 @@ router.post('/:token/start', async (req, res) => {
           role:    'user',
           content: `Start the interview. The respondent's name is ${session.respondent_name}.
 Write a warm 1-sentence greeting then naturally ask your first question — combined into one message.
-Respond in JSON: {"next_question": "greeting + first question", "needs_followup": false, "followup_reason": "", "section_complete_candidate": false, "section_completion_reason": ""}`,
+Respond in JSON: {"utterance": "greeting + first question", "answered_current_question": false, "needs_probe": false, "detected_exit_signal": "none"}`,
         }],
       });
 
@@ -697,7 +658,7 @@ Respond in JSON: {"next_question": "greeting + first question", "needs_followup"
         .replace(/\s*```$/i, '')
         .trim();
       const parsed = JSON.parse(cleaned);
-      if (parsed.next_question) greetingText = parsed.next_question;
+      if (parsed.utterance) greetingText = parsed.utterance;
     } catch (err) {
       console.warn('[Interview] Greeting generation failed, using fallback:', err.message);
     }
@@ -884,8 +845,7 @@ router.post('/:token/chat', async (req, res) => {
       ? state.completed_sections
       : [];
 
-    // 응답자가 종료 의사를 명확히 밝힌 경우 → 즉시 wrap_up
-    const userWantsStop = /^(stop|quit|end|exit|bye|goodbye|done|finish)\.?$/i.test(userAnswer);
+    const exitSignal = detectExitSignal(userAnswer);
 
     let assistantText;
     let finalSection = state.current_section;
@@ -893,11 +853,29 @@ router.post('/:token/chat', async (req, res) => {
     let decision;
     let sectionSummaryForTransition = null; // transition 시 한 번만 조회
 
-    if (userWantsStop || state.current_section === 'wrap_up') {
+    if (exitSignal === 'hard_stop' || state.current_section === 'wrap_up') {
       decision = { action: 'wrap_up' };
       assistantText = await generateWrapUpMessage(session.respondent_name, businessContext);
       finalSection = 'wrap_up';
       isCompleted = true;
+
+    } else if (exitSignal === 'soft_stop') {
+      const sTopics = getSectionTopics(session.question_list, state.current_section);
+      const rem = Math.max(sTopics.length - (state.question_index || 0) - 1, 0);
+      assistantText = rem > 0
+        ? `Of course! We have about ${rem} more question${rem > 1 ? 's' : ''} left — roughly ${rem * 2} more minute${rem * 2 !== 1 ? 's' : ''}. Shall I ask the most important one?`
+        : `Of course! We're actually almost done — just one last thing.`;
+      decision = { action: 'meta' };
+      finalSection = state.current_section;
+
+    } else if (exitSignal === 'time_check') {
+      const sTopics = getSectionTopics(session.question_list, state.current_section);
+      const rem = Math.max(sTopics.length - (state.question_index || 0) - 1, 0);
+      assistantText = rem > 0
+        ? `We have ${rem} question${rem > 1 ? 's' : ''} left in this part — about ${rem * 2} more minute${rem * 2 !== 1 ? 's' : ''}. Let's keep going!`
+        : `We're almost done with this part — just one or two more questions!`;
+      decision = { action: 'meta' };
+      finalSection = state.current_section;
 
     } else {
       // 1. 현재 섹션 context로 Claude 호출
@@ -940,7 +918,7 @@ router.post('/:token/chat', async (req, res) => {
         });
 
         const nextResult = await callClaudeForTurn(nextSystemPrompt, recentTurns);
-        assistantText = nextResult.next_question;
+        assistantText = nextResult.utterance;
         finalSection = decision.nextSection;
 
       } else if (decision.action === 'next_question') {
@@ -958,7 +936,7 @@ router.post('/:token/chat', async (req, res) => {
           totalQuestions: nextQTopics.length,
         });
         const nextQResult = await callClaudeForTurn(nextQPrompt, recentTurns);
-        assistantText = nextQResult.next_question;
+        assistantText = nextQResult.utterance;
         finalSection = state.current_section;
 
       } else if (decision.action === 'wrap_up') {
@@ -967,8 +945,8 @@ router.post('/:token/chat', async (req, res) => {
         isCompleted = true;
 
       } else {
-        // followup or continue: Claude가 생성한 next_question 사용
-        assistantText = claudeResult.next_question;
+        // followup or continue: Claude가 생성한 utterance 사용
+        assistantText = claudeResult.utterance;
         finalSection = state.current_section;
       }
     }
@@ -1041,6 +1019,19 @@ router.post('/:token/chat', async (req, res) => {
                  updated_at             = NOW()
              WHERE interview_session_id = $5`,
             [decision.questionIndex, candidateTurnCount, userTurnId, assistantTurnId, session.id]
+          );
+
+        } else if (decision.action === 'meta') {
+          // exit signal 대응 메타 응답 — question_index/followup_count 불변
+          await dbClient.query(
+            `UPDATE interview_state
+             SET section_turn_count     = $1,
+                 last_user_turn_id      = $2,
+                 last_assistant_turn_id = $3,
+                 state_version          = state_version + 1,
+                 updated_at             = NOW()
+             WHERE interview_session_id = $4`,
+            [candidateTurnCount, userTurnId, assistantTurnId, session.id]
           );
 
         } else if (decision.action === 'transition') {

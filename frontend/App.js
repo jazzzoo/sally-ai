@@ -16,6 +16,7 @@ import IntroScreen     from './src/screens/IntroScreen';
 import CreateScreen    from './src/screens/CreateScreen';
 import QuestionsScreen from './src/screens/QuestionsScreen';
 import InterviewScreen from './src/screens/InterviewScreen';
+import ReportScreen    from './src/screens/ReportScreen';
 // GenerateScreen 제거 — CreateScreen에 통합됨
 
 const Stack = createNativeStackNavigator();
@@ -29,12 +30,13 @@ const linking = {
       Create:    'create',
       Questions: 'questions',
       Interview: 'interview/:token',
+      Report:    'report/:reportId',
     },
   },
 };
 
 // NavBar를 숨길 라우트
-const HIDDEN_NAVBAR_ROUTES = new Set(['Interview']);
+const HIDDEN_NAVBAR_ROUTES = new Set(['Interview', 'Report']);
 
 // 웹 스크롤바 커스텀 CSS 주입
 if (typeof document !== 'undefined') {
@@ -81,6 +83,7 @@ export default function App() {
     if (typeof window !== 'undefined') {
       const path = window.location.pathname;
       if (path.startsWith('/interview/')) return 'Interview';
+      if (path.startsWith('/report/'))   return 'Report';
       if (path.startsWith('/create'))    return 'Create';
       if (path.startsWith('/questions')) return 'Questions';
     }
@@ -126,6 +129,7 @@ export default function App() {
               <Stack.Screen name="Create"    component={CreateScreen} />
               <Stack.Screen name="Questions" component={QuestionsScreen} />
               <Stack.Screen name="Interview" component={InterviewScreen} />
+              <Stack.Screen name="Report"    component={ReportScreen} />
             </Stack.Navigator>
           </NavigationContainer>
 

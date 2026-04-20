@@ -3,7 +3,7 @@
 // 데스크탑: CreateScreen 우측 패널에서 렌더
 // 모바일:   QuestionsScreen에서 렌더
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity,
   ScrollView, StyleSheet, Alert, Clipboard,
@@ -16,11 +16,11 @@ import EditPanel from './EditPanel';
 import GradientButton from './GradientButton';
 import ModalDialog from './ModalDialog';
 import useStore from '../store/useStore';
-import { questionListsApi, interviewSessionsApi } from '../api/client';
+import { questionListsApi, interviewSessionsApi, reportsApi } from '../api/client';
 import { colors, spacing, radius, textStyles, shadows } from '../theme';
 import { Copy, Share2 } from 'lucide-react-native';
 
-export default function QuestionsPanel({ scrollRef, style }) {
+export default function QuestionsPanel({ scrollRef, style, navigation }) {
   const { questionListCache, currentListId, generatedItems, updateQuestion, toggleHidden, setQuestionList, sessionForm } = useStore();
   const { businessSummary } = sessionForm;
 
@@ -35,11 +35,41 @@ export default function QuestionsPanel({ scrollRef, style }) {
   const [showLinkModal, setShowLinkModal] = useState(false);
   const [shareLink, setShareLink] = useState('');
   const [isLoadingLink, setIsLoadingLink] = useState(false);
+  const [interviewSessions, setInterviewSessions] = useState([]);
+  const [reports, setReports] = useState({});
 
   const toggle = useCallback(
     (id) => setExpanded((prev) => (prev === id ? null : id)),
     []
   );
+
+  useEffect(() => {
+    if (!listId) return;
+    let cancelled = false;
+    async function load() {
+      try {
+        const res = await interviewSessionsApi.list(listId);
+        if (cancelled) return;
+        const sessions = res.data || [];
+        setInterviewSessions(sessions);
+        const completedIds = sessions
+          .filter((s) => s.status === 'completed')
+          .map((s) => s.id);
+        if (completedIds.length === 0) return;
+        const rptRes = await reportsApi.list();
+        if (cancelled) return;
+        const rptMap = {};
+        for (const r of (rptRes.data || [])) {
+          if (completedIds.includes(r.interview_session_id)) {
+            rptMap[r.interview_session_id] = r;
+          }
+        }
+        setReports(rptMap);
+      } catch (_) {}
+    }
+    load();
+    return () => { cancelled = true; };
+  }, [listId]);
 
   async function handleRegenAll() {
     if (!listId) return;
@@ -96,6 +126,7 @@ export default function QuestionsPanel({ scrollRef, style }) {
       const created = await interviewSessionsApi.create(listId);
       setShareLink(created.data.url);
       setShowLinkModal(true);
+      setInterviewSessions((prev) => [created.data, ...prev]);
     } catch (err) {
       Alert.alert('Error', err.message || 'Failed to create interview link.');
     } finally {
@@ -213,6 +244,39 @@ export default function QuestionsPanel({ scrollRef, style }) {
           loading={isLoadingLink}
           style={{ marginTop: spacing.md }}
         />
+
+        {/* 인터뷰 세션 목록 */}
+        {interviewSessions.length > 0 && (
+          <View style={styles.sessionsSection}>
+            <Text style={styles.sectionLabel}>Interviews</Text>
+            {interviewSessions.map((s) => {
+              const report = reports[s.id];
+              return (
+                <View key={s.id} style={styles.sessionRow}>
+                  <View style={styles.sessionInfo}>
+                    <Text style={styles.sessionName}>
+                      {s.respondent_name || 'Pending...'}
+                    </Text>
+                    <Text style={styles.sessionDate}>
+                      {new Date(s.created_at).toLocaleDateString()}
+                    </Text>
+                  </View>
+                  <View style={styles.sessionRight}>
+                    <ReportBadge status={s.status} reportStatus={report?.status} />
+                    {report?.status === 'completed' && navigation && (
+                      <TouchableOpacity
+                        style={styles.viewReportBtn}
+                        onPress={() => navigation.navigate('Report', { reportId: report.id })}
+                      >
+                        <Text style={styles.viewReportText}>View</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+        )}
       </Pressable>
 
       {/* 인터뷰 링크 모달 */}
@@ -283,6 +347,23 @@ export default function QuestionsPanel({ scrollRef, style }) {
       />
     </ScrollView>
   );
+}
+
+// ── 리포트 상태 배지 ───────────────────────────────────────────
+function ReportBadge({ status, reportStatus }) {
+  if (status !== 'completed') {
+    const label = status === 'active' ? 'Active' : 'Abandoned';
+    const bg = status === 'active' ? '#E8F4FD' : '#F5F5F5';
+    const color = status === 'active' ? '#1976D2' : '#9E9E9E';
+    return <View style={[styles.badge, { backgroundColor: bg }]}><Text style={[styles.badgeText, { color }]}>{label}</Text></View>;
+  }
+  if (!reportStatus || reportStatus === 'pending' || reportStatus === 'generating') {
+    return <View style={[styles.badge, { backgroundColor: '#FFF8E1' }]}><Text style={[styles.badgeText, { color: '#F57C00' }]}>Generating...</Text></View>;
+  }
+  if (reportStatus === 'failed') {
+    return <View style={[styles.badge, { backgroundColor: '#FFEBEE' }]}><Text style={[styles.badgeText, { color: '#C62828' }]}>Failed</Text></View>;
+  }
+  return <View style={[styles.badge, { backgroundColor: '#E8F5E9' }]}><Text style={[styles.badgeText, { color: '#2E7D32' }]}>Report Ready</Text></View>;
 }
 
 // ── 리액션 행 ──────────────────────────────────────────────────
@@ -531,4 +612,46 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.textDisabled,
   },
+
+  // ── 인터뷰 세션 목록 ──────────────────────────────────────────
+  sessionsSection: {
+    marginTop: spacing.md,
+    gap: spacing.xs,
+  },
+  sectionLabel: {
+    ...textStyles.caption,
+    color: colors.textDisabled,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+    marginBottom: 4,
+  },
+  sessionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: colors.surface,
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingVertical: 10,
+    paddingHorizontal: spacing.md,
+  },
+  sessionInfo: { flex: 1 },
+  sessionName: { ...textStyles.bodyS, color: colors.textPrimary, fontWeight: '500' },
+  sessionDate: { ...textStyles.caption, color: colors.textDisabled, marginTop: 2 },
+  sessionRight: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
+  badge: {
+    borderRadius: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  badgeText: { fontSize: 11, fontWeight: '600' },
+  viewReportBtn: {
+    backgroundColor: colors.primary,
+    borderRadius: radius.sm,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  viewReportText: { fontSize: 12, fontWeight: '600', color: colors.white },
 });
