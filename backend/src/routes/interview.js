@@ -226,6 +226,13 @@ ${session1Rules}
 - Briefly acknowledge the respondent's last answer (1 short sentence max)
 - Avoid hollow affirmations: no "Great!", "Interesting!", "Awesome!"
 - NEVER ask a question semantically similar to one already asked in this section
+- SHORT ANSWER: If the answer is under 10 words or completely vague, set needs_probe=true and use one of the follow_up_hints provided. Never repeat a probe already used this turn. Set response_type="short_answer".
+- OFF_TOPIC: If the answer is unrelated to the question, gently redirect — briefly acknowledge then restate the question in different words. Set response_type="off_topic".
+- PARTICIPANT QUESTION (FAQ): If they ask how long the interview is or what it's for, answer in 1-2 sentences then return to the question. Set response_type="participant_question".
+- PARTICIPANT QUESTION (OPINION/ADVICE): If they ask for your opinion or advice, say "My role today is to listen and learn from you — I don't want to influence your thinking." Then return to the question. Set response_type="participant_question".
+- DISCOMFORT: If they signal discomfort ("I'd rather not", "personal", "uncomfortable"), do NOT probe. Say "No worries at all — let's move on." Set response_type="discomfort".
+- Always include response_type in your JSON output. Default is "normal".
+- You do not control probe count — the server tracks this. Just produce the best single response for this turn.
 
 [PREVIOUS SECTIONS — KEY FINDINGS]
 ${prevText}
@@ -239,12 +246,14 @@ Probes used: ${followupCount}/${maxFollowups}
   "utterance": "Sally's exact words to send to the respondent",
   "answered_current_question": false,
   "needs_probe": false,
-  "detected_exit_signal": "none"
+  "detected_exit_signal": "none",
+  "response_type": "normal"
 }
 
 answered_current_question: true if the respondent gave a substantive answer to the current question
 needs_probe: true ONLY if the answer was under 10 words or completely vague
-detected_exit_signal: "none" | "time_check" (asking how long left) | "soft_stop" (needs to leave soon) | "hard_stop" (stopping now)`;
+detected_exit_signal: "none" | "time_check" (asking how long left) | "soft_stop" (needs to leave soon) | "hard_stop" (stopping now)
+response_type: "normal" | "short_answer" | "off_topic" | "participant_question" | "discomfort"`;
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -280,11 +289,14 @@ async function callClaudeForTurn(systemPrompt, recentTurns, retryCount = 0) {
       throw new Error('Invalid JSON: missing utterance');
     }
 
+    const VALID_RESPONSE_TYPES = new Set(['normal', 'short_answer', 'off_topic', 'participant_question', 'discomfort']);
+    const rawType = String(parsed.response_type || 'normal');
     return {
       utterance:                 parsed.utterance.trim(),
       answered_current_question: Boolean(parsed.answered_current_question),
       needs_probe:               Boolean(parsed.needs_probe),
       detected_exit_signal:      String(parsed.detected_exit_signal || 'none'),
+      response_type:             VALID_RESPONSE_TYPES.has(rawType) ? rawType : 'normal',
     };
   } catch (err) {
     if (retryCount < 1) {
@@ -297,6 +309,7 @@ async function callClaudeForTurn(systemPrompt, recentTurns, retryCount = 0) {
       answered_current_question: false,
       needs_probe:               true,
       detected_exit_signal:      'none',
+      response_type:             'normal',
     };
   }
 }
@@ -961,8 +974,36 @@ router.post('/:token/chat', async (req, res) => {
       const recentTurns = await loadRecentTurnsForContext(session.id, 6);
       const claudeResult = await callClaudeForTurn(systemPrompt, recentTurns);
 
-      // 2. 서버 최종 결정
-      decision = makeServerDecision(state, claudeResult, wordCount, session.session_type, currentSectionTopics.length);
+      // 2. response_type 예외 처리 (서버 오버라이드)
+      const responseType = claudeResult.response_type || 'normal';
+      const recoveryCount = state.recovery_attempt_count || 0;
+      const orderedSectionsForSkip = session.session_type === 1
+        ? SECTION_ORDER.filter((s) => s !== 'wtp')
+        : SECTION_ORDER;
+
+      let forceSkip = false;
+      if (responseType === 'discomfort') {
+        forceSkip = true;
+      } else if ((responseType === 'off_topic' || responseType === 'short_answer') && recoveryCount >= 2) {
+        forceSkip = true;
+      }
+
+      if (forceSkip) {
+        const nextQuestionIdx = (state.question_index || 0) + 1;
+        const sectionIdx = orderedSectionsForSkip.indexOf(state.current_section);
+        if (nextQuestionIdx >= currentSectionTopics.length) {
+          const nextSec = orderedSectionsForSkip[sectionIdx + 1];
+          decision = nextSec ? { action: 'transition', nextSection: nextSec } : { action: 'wrap_up' };
+        } else {
+          decision = { action: 'next_question', questionIndex: nextQuestionIdx, isSkip: true };
+        }
+        assistantText = claudeResult.utterance;
+      }
+
+      // 3. 서버 최종 결정 (forceSkip 아닌 경우)
+      if (!decision) {
+        decision = makeServerDecision(state, claudeResult, wordCount, session.session_type, currentSectionTopics.length);
+      }
 
       if (decision.action === 'transition') {
         // 전환: 현재 섹션 요약 생성 후 새 섹션 opening 질문 요청
@@ -987,21 +1028,24 @@ router.post('/:token/chat', async (req, res) => {
         finalSection = decision.nextSection;
 
       } else if (decision.action === 'next_question') {
-        // followup 소진 → 다음 질문으로 강제 이동 (Claude 재호출)
-        const nextQTopics = getSectionTopics(session.question_list, state.current_section);
-        const nextQPrompt = buildSystemPrompt({
-          section:        state.current_section,
-          businessContext,
-          keyTopics:      nextQTopics,
-          completedSections,
-          followupCount:  0,
-          maxFollowups:   SECTION_CONFIG[state.current_section]?.maxFollowups ?? 0,
-          sessionType:    session.session_type,
-          questionIndex:  decision.questionIndex,
-          totalQuestions: nextQTopics.length,
-        });
-        const nextQResult = await callClaudeForTurn(nextQPrompt, recentTurns);
-        assistantText = nextQResult.utterance;
+        if (!decision.isSkip) {
+          // 일반 next_question: Claude 재호출로 다음 질문 생성
+          const nextQTopics = getSectionTopics(session.question_list, state.current_section);
+          const nextQPrompt = buildSystemPrompt({
+            section:        state.current_section,
+            businessContext,
+            keyTopics:      nextQTopics,
+            completedSections,
+            followupCount:  0,
+            maxFollowups:   SECTION_CONFIG[state.current_section]?.maxFollowups ?? 0,
+            sessionType:    session.session_type,
+            questionIndex:  decision.questionIndex,
+            totalQuestions: nextQTopics.length,
+          });
+          const nextQResult = await callClaudeForTurn(nextQPrompt, recentTurns);
+          assistantText = nextQResult.utterance;
+        }
+        // isSkip: assistantText already set (Claude's discomfort/skip acknowledgment)
         finalSection = state.current_section;
 
       } else if (decision.action === 'wrap_up') {
@@ -1045,45 +1089,55 @@ router.post('/:token/chat', async (req, res) => {
         // 섹션별 state 업데이트
         const candidateTurnCount = (state.section_turn_count || 0) + 1;
 
+        // recovery_attempt_count: off_topic/short_answer 시 증가, next_question 시 리셋
+        const newRecoveryCount = (responseType === 'off_topic' || responseType === 'short_answer')
+          ? (state.recovery_attempt_count || 0) + 1
+          : 0;
+
         if (decision.action === 'followup') {
           await dbClient.query(
             `UPDATE interview_state
-             SET followup_count         = followup_count + 1,
-                 section_turn_count     = $1,
-                 last_user_turn_id      = $2,
-                 last_assistant_turn_id = $3,
-                 state_version          = state_version + 1,
-                 updated_at             = NOW()
-             WHERE interview_session_id = $4`,
-            [candidateTurnCount, userTurnId, assistantTurnId, session.id]
+             SET followup_count              = followup_count + 1,
+                 recovery_attempt_count      = $1,
+                 section_turn_count          = $2,
+                 last_user_turn_id           = $3,
+                 last_assistant_turn_id      = $4,
+                 state_version               = state_version + 1,
+                 updated_at                  = NOW()
+             WHERE interview_session_id = $5`,
+            [newRecoveryCount, candidateTurnCount, userTurnId, assistantTurnId, session.id]
           );
 
         } else if (decision.action === 'continue') {
           await dbClient.query(
             `UPDATE interview_state
-             SET question_index         = question_index + 1,
-                 section_turn_count     = $1,
-                 followup_count         = 0,
-                 last_user_turn_id      = $2,
-                 last_assistant_turn_id = $3,
-                 state_version          = state_version + 1,
-                 updated_at             = NOW()
+             SET question_index              = question_index + 1,
+                 section_turn_count          = $1,
+                 followup_count              = 0,
+                 recovery_attempt_count      = 0,
+                 last_user_turn_id           = $2,
+                 last_assistant_turn_id      = $3,
+                 state_version               = state_version + 1,
+                 updated_at                  = NOW()
              WHERE interview_session_id = $4`,
             [candidateTurnCount, userTurnId, assistantTurnId, session.id]
           );
 
         } else if (decision.action === 'next_question') {
+          const skipIncrement = decision.isSkip ? 1 : 0;
           await dbClient.query(
             `UPDATE interview_state
-             SET question_index         = $1,
-                 section_turn_count     = $2,
-                 followup_count         = 0,
-                 last_user_turn_id      = $3,
-                 last_assistant_turn_id = $4,
-                 state_version          = state_version + 1,
-                 updated_at             = NOW()
-             WHERE interview_session_id = $5`,
-            [decision.questionIndex, candidateTurnCount, userTurnId, assistantTurnId, session.id]
+             SET question_index              = $1,
+                 section_turn_count          = $2,
+                 followup_count              = 0,
+                 recovery_attempt_count      = 0,
+                 skip_count                  = skip_count + $3,
+                 last_user_turn_id           = $4,
+                 last_assistant_turn_id      = $5,
+                 state_version               = state_version + 1,
+                 updated_at                  = NOW()
+             WHERE interview_session_id = $6`,
+            [decision.questionIndex, candidateTurnCount, skipIncrement, userTurnId, assistantTurnId, session.id]
           );
 
         } else if (decision.action === 'meta') {
@@ -1103,10 +1157,11 @@ router.post('/:token/chat', async (req, res) => {
           // sectionSummaryForTransition은 AI 단계에서 이미 조회함
           await dbClient.query(
             `UPDATE interview_state
-             SET current_section        = $1,
-                 question_index         = 0,
-                 section_turn_count     = 0,
-                 followup_count         = 0,
+             SET current_section             = $1,
+                 question_index              = 0,
+                 section_turn_count          = 0,
+                 followup_count              = 0,
+                 recovery_attempt_count      = 0,
                  completed_sections     = completed_sections || $2::jsonb,
                  transition_reason      = 'section_complete',
                  last_user_turn_id      = $3,

@@ -37,6 +37,7 @@ export default function QuestionsPanel({ scrollRef, style, navigation }) {
   const [isLoadingLink, setIsLoadingLink] = useState(false);
   const [interviewSessions, setInterviewSessions] = useState([]);
   const [reports, setReports] = useState({});
+  const [sessionLinkModal, setSessionLinkModal] = useState({ visible: false, url: '' });
 
   const toggle = useCallback(
     (id) => setExpanded((prev) => (prev === id ? null : id)),
@@ -251,8 +252,23 @@ export default function QuestionsPanel({ scrollRef, style, navigation }) {
             <Text style={styles.sectionLabel}>Interviews</Text>
             {interviewSessions.map((s) => {
               const report = reports[s.id];
+              const isCompleted = s.status === 'completed';
+              const isActive = s.status === 'active';
+              const appUrl = 'https://sally-ai-gamma.vercel.app';
+              const interviewUrl = s.url || (s.link_token ? `${appUrl}/interview/${s.link_token}` : null);
               return (
-                <View key={s.id} style={styles.sessionRow}>
+                <TouchableOpacity
+                  key={s.id}
+                  style={styles.sessionRow}
+                  activeOpacity={0.7}
+                  onPress={() => {
+                    if (isCompleted && report?.status === 'completed' && navigation) {
+                      navigation.navigate('Report', { reportId: report.id });
+                    } else if (isActive && interviewUrl) {
+                      setSessionLinkModal({ visible: true, url: interviewUrl });
+                    }
+                  }}
+                >
                   <View style={styles.sessionInfo}>
                     <Text style={styles.sessionName}>
                       {s.respondent_name || 'Pending...'}
@@ -263,16 +279,8 @@ export default function QuestionsPanel({ scrollRef, style, navigation }) {
                   </View>
                   <View style={styles.sessionRight}>
                     <ReportBadge status={s.status} reportStatus={report?.status} />
-                    {report?.status === 'completed' && navigation && (
-                      <TouchableOpacity
-                        style={styles.viewReportBtn}
-                        onPress={() => navigation.navigate('Report', { reportId: report.id })}
-                      >
-                        <Text style={styles.viewReportText}>View</Text>
-                      </TouchableOpacity>
-                    )}
                   </View>
-                </View>
+                </TouchableOpacity>
               );
             })}
           </View>
@@ -317,6 +325,39 @@ export default function QuestionsPanel({ scrollRef, style, navigation }) {
             <TouchableOpacity
               style={styles.modalBtnClose}
               onPress={() => setShowLinkModal(false)}
+            >
+              <Text style={styles.modalBtnCloseText}>Close</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* 인터뷰 세션 링크 모달 */}
+      <Modal
+        visible={sessionLinkModal.visible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setSessionLinkModal({ visible: false, url: '' })}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Interview Link</Text>
+            <View style={styles.linkBox}>
+              <Text style={styles.linkText} selectable>{sessionLinkModal.url}</Text>
+            </View>
+            <TouchableOpacity
+              style={styles.modalBtnPrimary}
+              onPress={() => {
+                Clipboard.setString(sessionLinkModal.url);
+                setSessionLinkModal({ visible: false, url: '' });
+                Alert.alert('Interview link copied!');
+              }}
+            >
+              <Text style={styles.modalBtnPrimaryText}>Copy Link</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.modalBtnClose}
+              onPress={() => setSessionLinkModal({ visible: false, url: '' })}
             >
               <Text style={styles.modalBtnCloseText}>Close</Text>
             </TouchableOpacity>
