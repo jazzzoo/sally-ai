@@ -9,7 +9,7 @@ import QuestionsPanel from '../components/QuestionsPanel';
 import useStore        from '../store/useStore';
 import { colors } from '../theme';
 
-export default function QuestionsScreen({ navigation }) {
+export default function QuestionsScreen() {
   const setNavTitle = useStore((s) => s.setNavTitle);
   const sessionForm = useStore((s) => s.sessionForm);
 
@@ -22,7 +22,7 @@ export default function QuestionsScreen({ navigation }) {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <QuestionsPanel navigation={navigation} />
+      <QuestionsPanel />
     </SafeAreaView>
   );
 }

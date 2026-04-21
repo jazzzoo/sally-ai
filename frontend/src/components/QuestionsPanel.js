@@ -9,6 +9,7 @@ import {
   ScrollView, StyleSheet, Alert, Clipboard,
   Share, Pressable, Modal, Platform,
 } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 
 import NeuCard from './NeuCard';
 import SlidePanel from './SlidePanel';
@@ -20,7 +21,20 @@ import { questionListsApi, interviewSessionsApi, reportsApi } from '../api/clien
 import { colors, spacing, radius, textStyles, shadows } from '../theme';
 import { Copy, Share2 } from 'lucide-react-native';
 
-export default function QuestionsPanel({ scrollRef, style, navigation }) {
+async function copyToClipboard(text) {
+  try {
+    if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+    } else {
+      Clipboard.setString(text);
+    }
+  } catch (_) {
+    Clipboard.setString(text);
+  }
+}
+
+export default function QuestionsPanel({ scrollRef, style }) {
+  const navigation = useNavigation();
   const { questionListCache, currentListId, generatedItems, updateQuestion, toggleHidden, setQuestionList, sessionForm } = useStore();
   const { businessSummary } = sessionForm;
 
@@ -37,7 +51,6 @@ export default function QuestionsPanel({ scrollRef, style, navigation }) {
   const [isLoadingLink, setIsLoadingLink] = useState(false);
   const [interviewSessions, setInterviewSessions] = useState([]);
   const [reports, setReports] = useState({});
-  const [sessionLinkModal, setSessionLinkModal] = useState({ visible: false, url: '' });
 
   const toggle = useCallback(
     (id) => setExpanded((prev) => (prev === id ? null : id)),
@@ -246,46 +259,63 @@ export default function QuestionsPanel({ scrollRef, style, navigation }) {
           style={{ marginTop: spacing.md }}
         />
 
-        {/* 인터뷰 세션 목록 */}
-        {interviewSessions.length > 0 && (
-          <View style={styles.sessionsSection}>
-            <Text style={styles.sectionLabel}>Interviews</Text>
-            {interviewSessions.map((s) => {
-              const report = reports[s.id];
-              const isCompleted = s.status === 'completed';
-              const isActive = s.status === 'active';
-              const appUrl = 'https://sally-ai-gamma.vercel.app';
-              const interviewUrl = s.url || (s.link_token ? `${appUrl}/interview/${s.link_token}` : null);
-              return (
-                <TouchableOpacity
-                  key={s.id}
-                  style={styles.sessionRow}
-                  activeOpacity={0.7}
-                  onPress={() => {
-                    if (isCompleted && report?.status === 'completed' && navigation) {
-                      navigation.navigate('Report', { reportId: report.id });
-                    } else if (isActive && interviewUrl) {
-                      setSessionLinkModal({ visible: true, url: interviewUrl });
-                    }
-                  }}
-                >
-                  <View style={styles.sessionInfo}>
-                    <Text style={styles.sessionName}>
-                      {s.respondent_name || 'Pending...'}
-                    </Text>
-                    <Text style={styles.sessionDate}>
-                      {new Date(s.created_at).toLocaleDateString()}
-                    </Text>
-                  </View>
-                  <View style={styles.sessionRight}>
-                    <ReportBadge status={s.status} reportStatus={report?.status} />
-                  </View>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        )}
       </Pressable>
+
+      {/* 인터뷰 세션 목록 — Pressable 밖에 배치 (이벤트 가로채기 방지) */}
+      {interviewSessions.length > 0 && (
+        <View style={styles.sessionsSection}>
+          <Text style={styles.sectionLabel}>Interviews</Text>
+          {interviewSessions.map((s) => {
+            const report = reports[s.id];
+            const isCompleted = s.status === 'completed';
+            const isActive = s.status === 'active';
+            const appUrl = 'https://sally-ai-gamma.vercel.app';
+            const interviewUrl = s.url || (s.link_token ? `${appUrl}/interview/${s.link_token}` : null);
+            return (
+              <Pressable
+                key={s.id}
+                style={({ pressed }) => [
+                  styles.sessionRow,
+                  pressed && { opacity: 0.75 },
+                ]}
+                onPress={() => {
+                  console.log('[SessionRow] pressed, status=', s.status, 'report=', report?.status);
+                  if (isCompleted && report?.status === 'completed') {
+                    navigation.navigate('Report', { reportId: report.id });
+                  } else if (isActive && interviewUrl) {
+                    Alert.alert(
+                      'Interview Link',
+                      interviewUrl,
+                      [
+                        {
+                          text: 'Copy Link',
+                          onPress: async () => {
+                            await copyToClipboard(interviewUrl);
+                            Alert.alert('Copied!');
+                          },
+                        },
+                        { text: 'Close', style: 'cancel' },
+                      ]
+                    );
+                  }
+                }}
+              >
+                <View style={styles.sessionInfo}>
+                  <Text style={styles.sessionName}>
+                    {s.respondent_name || 'Pending...'}
+                  </Text>
+                  <Text style={styles.sessionDate}>
+                    {new Date(s.created_at).toLocaleDateString()}
+                  </Text>
+                </View>
+                <View style={styles.sessionRight}>
+                  <ReportBadge status={s.status} reportStatus={report?.status} />
+                </View>
+              </Pressable>
+            );
+          })}
+        </View>
+      )}
 
       {/* 인터뷰 링크 모달 */}
       <Modal
@@ -325,39 +355,6 @@ export default function QuestionsPanel({ scrollRef, style, navigation }) {
             <TouchableOpacity
               style={styles.modalBtnClose}
               onPress={() => setShowLinkModal(false)}
-            >
-              <Text style={styles.modalBtnCloseText}>Close</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
-
-      {/* 인터뷰 세션 링크 모달 */}
-      <Modal
-        visible={sessionLinkModal.visible}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setSessionLinkModal({ visible: false, url: '' })}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>Interview Link</Text>
-            <View style={styles.linkBox}>
-              <Text style={styles.linkText} selectable>{sessionLinkModal.url}</Text>
-            </View>
-            <TouchableOpacity
-              style={styles.modalBtnPrimary}
-              onPress={() => {
-                Clipboard.setString(sessionLinkModal.url);
-                setSessionLinkModal({ visible: false, url: '' });
-                Alert.alert('Interview link copied!');
-              }}
-            >
-              <Text style={styles.modalBtnPrimaryText}>Copy Link</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.modalBtnClose}
-              onPress={() => setSessionLinkModal({ visible: false, url: '' })}
             >
               <Text style={styles.modalBtnCloseText}>Close</Text>
             </TouchableOpacity>

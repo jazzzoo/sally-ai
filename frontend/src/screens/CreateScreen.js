@@ -502,7 +502,7 @@ export default function CreateScreen({ navigation }) {
 
             {/* 생성 완료 — QuestionsPanel 전환 */}
             {mode === 'questions' && (
-              <QuestionsPanel style={{ flex: 1 }} navigation={navigation} />
+              <QuestionsPanel style={{ flex: 1 }} />
             )}
 
             {/* 생성 중 — 스트리밍 미리보기 */}
