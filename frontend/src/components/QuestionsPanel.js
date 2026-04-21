@@ -10,6 +10,7 @@ import {
   Share, Pressable, Modal, Platform,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
+import InterviewLinkModal from './InterviewLinkModal';
 
 import NeuCard from './NeuCard';
 import SlidePanel from './SlidePanel';
@@ -21,17 +22,6 @@ import { questionListsApi, interviewSessionsApi, reportsApi } from '../api/clien
 import { colors, spacing, radius, textStyles, shadows } from '../theme';
 import { Copy, Share2 } from 'lucide-react-native';
 
-async function copyToClipboard(text) {
-  try {
-    if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
-      await navigator.clipboard.writeText(text);
-    } else {
-      Clipboard.setString(text);
-    }
-  } catch (_) {
-    Clipboard.setString(text);
-  }
-}
 
 export default function QuestionsPanel({ scrollRef, style }) {
   const navigation = useNavigation();
@@ -51,6 +41,7 @@ export default function QuestionsPanel({ scrollRef, style }) {
   const [isLoadingLink, setIsLoadingLink] = useState(false);
   const [interviewSessions, setInterviewSessions] = useState([]);
   const [reports, setReports] = useState({});
+  const [linkModal, setLinkModal] = useState({ visible: false, url: null });
 
   const toggle = useCallback(
     (id) => setExpanded((prev) => (prev === id ? null : id)),
@@ -282,24 +273,12 @@ export default function QuestionsPanel({ scrollRef, style }) {
                     return;
                   }
                   if (s.status === 'active' || s.status === 'pending') {
-                    const url = s.link_token
-                      ? `https://sally-ai-gamma.vercel.app/interview/${s.link_token}`
-                      : s.url || null;
-                    Alert.alert(
-                      'Interview Link',
-                      url || 'Link not available',
-                      [
-                        url ? {
-                          text: 'Copy Link',
-                          onPress: () => {
-                            navigator.clipboard?.writeText(url)
-                              .catch(() => console.log('Copy failed'));
-                            Alert.alert('Copied!');
-                          },
-                        } : null,
-                        { text: 'Close' },
-                      ].filter(Boolean)
-                    );
+                    setLinkModal({
+                      visible: true,
+                      url: s.link_token
+                        ? `https://sally-ai-gamma.vercel.app/interview/${s.link_token}`
+                        : s.url || null,
+                    });
                     return;
                   }
                 }}
@@ -367,6 +346,12 @@ export default function QuestionsPanel({ scrollRef, style }) {
       </Modal>
 
       {/* 질문 리스트 공유 (Share2 아이콘 → 팀원 공유용) */}
+      <InterviewLinkModal
+        visible={linkModal.visible}
+        url={linkModal.url}
+        onClose={() => setLinkModal({ visible: false, url: null })}
+      />
+
       <ModalDialog
         visible={showFeedbackModal}
         title="Before you export..."
