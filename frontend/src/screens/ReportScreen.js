@@ -13,6 +13,11 @@ const AUTO_RETRY_MS    = 30000;
 
 export default function ReportScreen({ route, navigation }) {
   const { reportId } = route.params;
+
+  useEffect(() => {
+    if (typeof document !== 'undefined') document.title = 'Sally - Report';
+  }, []);
+
   const [report, setReport]       = useState(null);
   const [loading, setLoading]     = useState(true);
   const [error, setError]         = useState(null);

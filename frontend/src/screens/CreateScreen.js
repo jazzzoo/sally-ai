@@ -122,6 +122,10 @@ export default function CreateScreen({ navigation }) {
   const { width } = useWindowDimensions();
   const isDesktop = width >= MOBILE_BP;
 
+  useEffect(() => {
+    if (typeof document !== 'undefined') document.title = 'Sally - Create';
+  }, []);
+
   const {
     sessionForm, updateSessionForm, resetGeneration,
     isGenerating, setIsGenerating, generatedItems,

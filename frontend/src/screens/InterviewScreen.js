@@ -122,6 +122,10 @@ function NamePrompt({ onSubmit, isLoading }) {
 export default function InterviewScreen({ route }) {
   const token = route?.params?.token;
 
+  useEffect(() => {
+    if (typeof document !== 'undefined') document.title = 'Sally - Interview';
+  }, []);
+
   const [sessionInfo, setSessionInfo] = useState(null);
   const [turns, setTurns] = useState([]);
   const [inputText, setInputText] = useState('');
