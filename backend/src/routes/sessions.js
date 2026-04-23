@@ -526,6 +526,58 @@ router.get('/:id/generate-stream', authenticateGuest, async (req, res) => {
       console.error('[Sessions] DB save error:', dbErr.message);
     }
 
+    // ── 번역 생성 (비영어 business_summary인 경우) ──
+    const isNonEnglish = /[^\x00-\x7F]/.test(inputContext.business_summary || '');
+    if (isNonEnglish && questionListId) {
+      try {
+        const allItems = [
+          ...(parsed.icebreakers || []),
+          ...(parsed.questions   || []),
+        ].map((q) => ({ id: q.id, text: q.text || '', why: q.why || '' }));
+
+        const transResponse = await anthropic.messages.create({
+          model: process.env.AI_MODEL_PRIMARY || 'claude-haiku-4-5-20251001',
+          max_tokens: 4000,
+          system: 'You are a professional translator. Output only valid JSON, no explanation.',
+          messages: [{
+            role: 'user',
+            content: `Translate the following interview questions to the same language as this business summary:\n${inputContext.business_summary}\n\nFor each item, provide:\n- text_translated: natural translation of the question/text\n- why_translated: natural translation of the why explanation\n\nKeep interview/research terminology natural and professional.\nOutput JSON only:\n{"translations": [{"id": "q_1", "text_translated": "...", "why_translated": "..."}]}\n\nItems to translate:\n${JSON.stringify(allItems)}`,
+          }],
+        });
+
+        const rawTrans = transResponse.content[0].text
+          .replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/\s*```$/i, '').trim();
+        const transData = JSON.parse(rawTrans);
+
+        const transMap = {};
+        for (const t of (transData.translations || [])) {
+          transMap[t.id] = t;
+        }
+        for (const ice of (parsed.icebreakers || [])) {
+          if (transMap[ice.id]) {
+            ice.text_translated = transMap[ice.id].text_translated || null;
+            ice.why_translated  = transMap[ice.id].why_translated  || null;
+          }
+        }
+        for (const q of (parsed.questions || [])) {
+          if (transMap[q.id]) {
+            q.text_translated = transMap[q.id].text_translated || null;
+            q.why_translated  = transMap[q.id].why_translated  || null;
+          }
+        }
+
+        await withRLS(req.guestId, async (client) => {
+          await client.query(
+            `UPDATE question_lists SET questions = $1 WHERE id = $2`,
+            [JSON.stringify(parsed), questionListId]
+          );
+        });
+        console.log('[Sessions] Translation complete');
+      } catch (transErr) {
+        console.error('[Sessions] Translation failed (non-fatal):', transErr.message);
+      }
+    }
+
     // ── 완료 이벤트 ──
     sendEvent('complete', {
       question_list_id: questionListId,

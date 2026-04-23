@@ -90,13 +90,16 @@ function normalizeQuestions(raw) {
     const icebreakers = raw?.icebreakers || [];
     for (let i = 0; i < icebreakers.length; i++) {
         const ice = icebreakers[i];
+        const iceHints = ice.follow_up_hint || ice.follow_up;
         items.push({
             type: 'icebreaker',
             number: -(i + 1),
-            index: i, // -1, -2, -3 으로 질문 number와 충돌 방지
+            index: i,
             text: ice.text || ice.question_text || ice.question || '',
             why: ice.why || ice.reason || '',
-            follow_up: (Array.isArray(ice.follow_up) ? ice.follow_up : [])
+            text_translated: ice.text_translated || null,
+            why_translated:  ice.why_translated  || null,
+            follow_up: (Array.isArray(iceHints) ? iceHints : [])
                 .map(fq => typeof fq === 'string' ? fq : fq.text || fq.trigger || JSON.stringify(fq)),
         });
     }
@@ -104,6 +107,7 @@ function normalizeQuestions(raw) {
     const questions = raw?.questions || [];
     for (let i = 0; i < questions.length; i++) {
         const q = questions[i];
+        const qHints = q.follow_up_hint || q.follow_up;
         items.push({
             type: 'question',
             number: q.number ?? i + 1,
@@ -111,7 +115,9 @@ function normalizeQuestions(raw) {
             hidden: q.hidden || false,
             text: q.text || q.question_text || q.question || '',
             why: q.why || q.reason || '',
-            follow_up: (Array.isArray(q.follow_up) ? q.follow_up : [])
+            text_translated: q.text_translated || null,
+            why_translated:  q.why_translated  || null,
+            follow_up: (Array.isArray(qHints) ? qHints : [])
                 .map(fq => typeof fq === 'string' ? fq : fq.text || fq.trigger || JSON.stringify(fq)),
         });
     }

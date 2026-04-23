@@ -111,9 +111,23 @@ export default function EditPanel({ item, listId, onUpdate }) {
           </Section>
         )}
 
+        {/* 질문 텍스트 + 번역 (일반 질문만, text_translated 있을 때) */}
+        {!isIce && !isReaction && item.text_translated && (
+          <Section label="Question">
+            <View style={styles.insetBox}>
+              <Text style={styles.translatedNoteLabel}>EN — Respondent</Text>
+              <Text style={styles.currentText}>{item.text}</Text>
+            </View>
+            <View style={[styles.insetBox, { marginTop: spacing.xs }]}>
+              <Text style={styles.translatedNoteLabel}>Translation</Text>
+              <Text style={styles.currentText}>{item.text_translated}</Text>
+            </View>
+          </Section>
+        )}
+
         {/* 질문 텍스트 직접 수정 (일반 질문만) */}
         {!isIce && !isReaction && isEditing && (
-          <Section label="Current Text">
+          <Section label="Edit Text (EN)">
             <View style={styles.insetBox}>
               <TextInput
                 style={[styles.currentText, { minHeight: 60 }]}
@@ -132,20 +146,26 @@ export default function EditPanel({ item, listId, onUpdate }) {
           </Section>
         )}
 
-        {/* 왜 이 질문? (일반 질문만) */}
-        {!isIce && !isReaction && item.why && (
+        {/* 왜 이 질문? (일반 질문만) - 번역 우선, 영어 원문 아래 표시 */}
+        {!isIce && !isReaction && (item.why || item.why_translated) && (
           <Section label="Why This Question?">
             <View style={styles.whyBox}>
               <Text style={styles.whyLabel}>Why? </Text>
-              <Text style={styles.whyText}>{item.why}</Text>
+              <Text style={styles.whyText}>{item.why_translated || item.why}</Text>
             </View>
+            {item.why_translated && (
+              <View style={[styles.whyBox, { marginTop: spacing.xs }]}>
+                <Text style={styles.enNoteLabel}>EN </Text>
+                <Text style={styles.enNoteText}>{item.why}</Text>
+              </View>
+            )}
           </Section>
         )}
 
         {/* 후속 질문 (일반 질문만) */}
-        {!isIce && !isReaction && item.follow_up?.length > 0 && (
+        {!isIce && !isReaction && (item.follow_up_hint || item.follow_up)?.length > 0 && (
           <Section label="Follow-up Suggestions">
-            {item.follow_up.map((fq, i) => (
+            {(item.follow_up_hint || item.follow_up).map((fq, i) => (
               <View key={i} style={styles.followUpItem}>
                 <Text style={styles.followUpText}>
                   {typeof fq === 'string' ? fq : fq.text || fq.trigger || ''}
@@ -318,6 +338,9 @@ const styles = StyleSheet.create({
   },
   whyLabel: { ...textStyles.caption, color: colors.primaryEnd, fontWeight: '600' },
   whyText: { ...textStyles.caption, color: colors.textSecondary, lineHeight: 18, flex: 1 },
+  enNoteLabel: { ...textStyles.caption, color: colors.textDisabled, fontWeight: '600' },
+  enNoteText: { ...textStyles.caption, color: colors.textDisabled, lineHeight: 17, flex: 1, fontSize: 11 },
+  translatedNoteLabel: { ...textStyles.caption, color: colors.textDisabled, fontWeight: '600', marginBottom: 4 },
 
   // 후속 질문
   followUpItem: {
