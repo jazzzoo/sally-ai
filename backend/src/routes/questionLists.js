@@ -192,14 +192,14 @@ router.post('/:id/regenerate/:num', authenticateGuest, async (req, res) => {
             });
         }
 
-        // AI로 수정
-        const prompt = `다음 인터뷰 질문을 아래 지시에 따라 수정해줘.
+        // AI로 수정 (영어로만 생성)
+        const prompt = `Revise the following interview question according to the instruction below.
 
-원본 질문: "${target.text || target.question_text}"
-수정 지시: "${instruction.trim()}"
+Original question: "${target.text || target.question_text}"
+Revision instruction: "${instruction.trim()}"
 
-수정된 질문만 JSON으로 반환해줘. 마크다운 없이 순수 JSON만:
-{"text": "수정된 질문 텍스트", "why": "왜 이 질문인가 설명", "revision_reason": "어떻게 수정했고 왜 이렇게 바꿨는지 1~2문장"}`;
+Return ONLY valid JSON, no markdown:
+{"text": "revised question in English (past-behavior form)", "why": "why this question in English (1-2 sentences, customer development principles)", "revision_reason": "what changed and why (1-2 sentences in English)"}`;
 
         const response = await anthropic.messages.create({
             model: process.env.AI_MODEL_PRIMARY || 'claude-haiku-4-5-20251001',
@@ -210,6 +210,30 @@ router.post('/:id/regenerate/:num', authenticateGuest, async (req, res) => {
         const rawText = response.content[0]?.text || '';
         const cleaned = rawText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
         const updated = JSON.parse(cleaned);
+
+        // 번역 (비영어 창업자인 경우)
+        const businessSummary = row.input_context?.business_summary || '';
+        const isNonEnglish = /[^\x00-\x7F]/.test(businessSummary);
+        if (isNonEnglish) {
+            try {
+                const transResponse = await anthropic.messages.create({
+                    model: process.env.AI_MODEL_PRIMARY || 'claude-haiku-4-5-20251001',
+                    max_tokens: 1000,
+                    system: 'You are a professional translator. Output only valid JSON, no explanation.',
+                    messages: [{
+                        role: 'user',
+                        content: `Translate the following interview question fields to the same language as this business summary:\n${businessSummary}\n\nOutput JSON only:\n{"text_translated": "...", "why_translated": "..."}\n\nFields to translate:\n${JSON.stringify({ text: updated.text || '', why: updated.why || '' })}`,
+                    }],
+                });
+                const rawTrans = transResponse.content[0].text
+                    .replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/\s*```$/i, '').trim();
+                const trans = JSON.parse(rawTrans);
+                updated.text_translated = trans.text_translated || null;
+                updated.why_translated  = trans.why_translated  || null;
+            } catch (transErr) {
+                console.error('[QuestionLists] Translation failed (non-fatal):', transErr.message);
+            }
+        }
 
         // DB 업데이트
         await withRLS(req.guestId, async (client) => {

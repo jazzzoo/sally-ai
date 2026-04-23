@@ -412,7 +412,7 @@ router.get('/:id/generate-stream', authenticateGuest, async (req, res) => {
       messages: [
         {
           role: 'user',
-          content: `Generate the question list in JSON format following the instructions above. Never use markdown code blocks. Output pure JSON only. The business summary language is: "${inputContext.business_summary?.match(/[ㄱ-ㅎㅏ-ㅣ가-힣]/) ? 'Korean' : 'English'}". Respond in that language only.`,
+          content: `Generate the question list in JSON format following the instructions above. Never use markdown code blocks. Output pure JSON only. ALL fields must be written in English only.`,
         },
       ],
     });
