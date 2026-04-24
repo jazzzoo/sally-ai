@@ -185,7 +185,15 @@ function CompletedReport({ report }) {
 
   return (
     <View style={styles.reportContainer}>
-      <Text style={styles.respondentName}>{report?.respondent_name || 'Anonymous'}</Text>
+      <View style={styles.respondentRow}>
+        <Text style={styles.respondentName}>{report?.respondent_name || 'Anonymous'}</Text>
+        {(report?.completed_at || report?.created_at) && (
+          <Text style={styles.respondentDate}>
+            {'  ·  '}
+            {(() => { const d = new Date(report.completed_at || report.created_at); return `${d.getFullYear()}. ${d.getMonth() + 1}. ${d.getDate()}`; })()}
+          </Text>
+        )}
+      </View>
 
       {/* 1. Respondent Context */}
       {r?.respondent_context && (
@@ -469,7 +477,9 @@ const styles = StyleSheet.create({
 
   // ── Report layout
   reportContainer: { gap: spacing.md },
-  respondentName: { ...textStyles.h2, color: colors.textPrimary, marginBottom: spacing.xs },
+  respondentRow: { flexDirection: 'row', alignItems: 'baseline', flexWrap: 'wrap', marginBottom: spacing.xs },
+  respondentName: { ...textStyles.h2, color: colors.textPrimary },
+  respondentDate: { ...textStyles.bodyS, color: colors.textDisabled, marginLeft: 4 },
 
   section: {
     backgroundColor: colors.surface,

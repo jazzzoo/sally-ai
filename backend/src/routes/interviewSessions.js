@@ -127,9 +127,12 @@ router.get('/', authenticateGuest, async (req, res) => {
            is2.question_list_id,
            ql.title AS question_list_title,
            (SELECT COUNT(*) FROM interview_turns it
-            WHERE it.interview_session_id = is2.id AND it.role = 'user') AS response_count
+            WHERE it.interview_session_id = is2.id AND it.role = 'user') AS response_count,
+           ist.current_section,
+           ist.completed_sections
          FROM interview_sessions is2
          JOIN question_lists ql ON is2.question_list_id = ql.id
+         LEFT JOIN interview_state ist ON ist.interview_session_id = is2.id
          ${whereClause}
          ORDER BY is2.created_at DESC`,
         params

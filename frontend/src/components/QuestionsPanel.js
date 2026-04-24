@@ -19,7 +19,8 @@ import GradientButton from './GradientButton';
 import ModalDialog from './ModalDialog';
 import useStore from '../store/useStore';
 import { questionListsApi, interviewSessionsApi, reportsApi } from '../api/client';
-import { colors, spacing, radius, textStyles, shadows } from '../theme';
+import { colors, gradientColors, spacing, radius, textStyles, shadows } from '../theme';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Copy, Share2, List } from 'lucide-react-native';
 
 
@@ -62,33 +63,38 @@ export default function QuestionsPanel({ scrollRef, style }) {
     []
   );
 
-  useEffect(() => {
+  const loadSessions = useCallback(async () => {
     if (!listId) return;
-    let cancelled = false;
-    async function load() {
-      try {
-        const res = await interviewSessionsApi.list(listId);
-        if (cancelled) return;
-        const sessions = res.data || [];
-        setInterviewSessions(sessions);
-        const completedIds = sessions
-          .filter((s) => s.status === 'completed')
-          .map((s) => s.id);
-        if (completedIds.length === 0) return;
-        const rptRes = await reportsApi.list();
-        if (cancelled) return;
-        const rptMap = {};
-        for (const r of (rptRes.data || [])) {
-          if (completedIds.includes(r.interview_session_id)) {
-            rptMap[r.interview_session_id] = r;
-          }
+    try {
+      const res = await interviewSessionsApi.list(listId);
+      const sessions = res.data || [];
+      setInterviewSessions(sessions);
+      const completedIds = sessions
+        .filter((s) => s.status === 'completed')
+        .map((s) => s.id);
+      if (completedIds.length === 0) return;
+      const rptRes = await reportsApi.list();
+      const rptMap = {};
+      for (const r of (rptRes.data || [])) {
+        if (completedIds.includes(r.interview_session_id)) {
+          rptMap[r.interview_session_id] = r;
         }
-        setReports(rptMap);
-      } catch (_) {}
-    }
-    load();
-    return () => { cancelled = true; };
+      }
+      setReports(rptMap);
+    } catch (_) {}
   }, [listId]);
+
+  useEffect(() => { loadSessions(); }, [loadSessions]);
+
+  const pollRef = useRef(null);
+  useEffect(() => {
+    if (interviewPanelOpen) {
+      pollRef.current = setInterval(loadSessions, 10000);
+    } else {
+      clearInterval(pollRef.current);
+    }
+    return () => clearInterval(pollRef.current);
+  }, [interviewPanelOpen, loadSessions]);
 
   async function handleRegenAll() {
     if (!listId) return;
@@ -300,6 +306,16 @@ export default function QuestionsPanel({ scrollRef, style }) {
                 <Text style={styles.slidePanelCloseText}>✕</Text>
               </Pressable>
             </View>
+            {interviewSessions.length > 0 && (() => {
+              const completedCount  = interviewSessions.filter(s => s.status === 'completed').length;
+              const inProgressCount = interviewSessions.filter(s => s.status === 'in_progress').length;
+              const pendingCount    = interviewSessions.filter(s => s.status === 'active').length;
+              return (
+                <Text style={styles.slidePanelSummary}>
+                  {completedCount} completed · {inProgressCount} in progress · {pendingCount} pending
+                </Text>
+              );
+            })()}
             <ScrollView style={styles.slidePanelScroll} contentContainerStyle={styles.slidePanelContent}>
               {interviewSessions.length === 0 ? (
                 <Text style={styles.slidePanelEmpty}>No interviews yet.{'\n'}Tap "Finalize → Share Link" to create one.</Text>
@@ -332,7 +348,17 @@ export default function QuestionsPanel({ scrollRef, style }) {
                     >
                       <View style={styles.sessionInfo}>
                         <Text style={styles.sessionName}>{s.respondent_name || 'Pending...'}</Text>
-                        <Text style={styles.sessionDate}>{new Date(s.created_at).toLocaleDateString()}</Text>
+                        {isActive && (
+                          <View style={styles.dotsRow}>
+                            {Array.from({ length: 10 }).map((_, i) => {
+                              const filled = i < (s.completed_sections?.length ?? 0) * 2;
+                              const fillColor = filled
+                                ? (i < 4 ? colors.primary : i < 7 ? colors.primaryMid : colors.primaryEnd)
+                                : colors.border;
+                              return <View key={i} style={[styles.dot, { backgroundColor: fillColor }]} />;
+                            })}
+                          </View>
+                        )}
                       </View>
                       <View style={styles.sessionRight}>
                         <ReportBadge status={s.status} reportStatus={report?.status} />
@@ -467,17 +493,43 @@ export default function QuestionsPanel({ scrollRef, style }) {
 function ReportBadge({ status, reportStatus }) {
   if (status !== 'completed') {
     const isActive = status === 'active' || status === 'in_progress';
-    const label = isActive ? 'Active' : 'Closed';
-    const bg = isActive ? '#E8F4FD' : '#F5F5F5';
-    return <View style={[styles.badge, { backgroundColor: bg }]}><Text style={[styles.badgeText, { color: colors.textSecondary }]}>{label}</Text></View>;
+    if (isActive) {
+      return (
+        <View style={[styles.badge, { backgroundColor: colors.primary }]}>
+          <Text style={[styles.badgeText, { color: colors.white }]}>Active</Text>
+        </View>
+      );
+    }
+    return (
+      <View style={styles.badge}>
+        <Text style={[styles.badgeText, { color: colors.placeholder }]}>Closed</Text>
+      </View>
+    );
   }
   if (!reportStatus || reportStatus === 'pending' || reportStatus === 'generating') {
-    return <View style={[styles.badge, { backgroundColor: '#FFF8E1' }]}><Text style={[styles.badgeText, { color: colors.textSecondary }]}>Generating...</Text></View>;
+    return (
+      <View style={styles.badge}>
+        <Text style={[styles.badgeText, { color: colors.textSecondary }]}>Generating...</Text>
+      </View>
+    );
   }
   if (reportStatus === 'failed') {
-    return <View style={[styles.badge, { backgroundColor: '#FFEBEE' }]}><Text style={[styles.badgeText, { color: colors.textSecondary }]}>Failed</Text></View>;
+    return (
+      <View style={[styles.badge, { backgroundColor: colors.error }]}>
+        <Text style={[styles.badgeText, { color: colors.white }]}>Failed</Text>
+      </View>
+    );
   }
-  return <View style={[styles.badge, { backgroundColor: '#E8F5E9' }]}><Text style={[styles.badgeText, { color: colors.textSecondary }]}>Report Ready</Text></View>;
+  return (
+    <LinearGradient
+      colors={gradientColors}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 0 }}
+      style={[styles.badge, { borderRadius: 10 }]}
+    >
+      <Text style={[styles.badgeText, { color: colors.white }]}>Report Ready</Text>
+    </LinearGradient>
+  );
 }
 
 // ── 리액션 행 ──────────────────────────────────────────────────
@@ -791,14 +843,15 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     backgroundColor: colors.surface,
     borderRadius: radius.sm,
-    borderWidth: 1,
-    borderColor: colors.border,
     paddingVertical: 10,
     paddingHorizontal: spacing.md,
   },
   sessionInfo: { flex: 1 },
   sessionName: { ...textStyles.bodyS, color: colors.textSecondary, fontWeight: '500' },
   sessionDate: { ...textStyles.caption, color: colors.textDisabled, marginTop: 2 },
+  slidePanelSummary: { ...textStyles.caption, color: colors.textDisabled, paddingHorizontal: spacing.md, paddingVertical: 8 },
+  dotsRow: { flexDirection: 'row', gap: 4, marginTop: 6 },
+  dot: { width: 8, height: 8, borderRadius: 4 },
   sessionRight: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
   badge: {
     borderRadius: 10,
@@ -814,12 +867,10 @@ const styles = StyleSheet.create({
   },
   viewReportText: { fontSize: 12, fontWeight: '600', color: colors.white },
   closeLinkBtn: {
-    backgroundColor: '#FFF0F0',
+    backgroundColor: colors.textSecondary,
     borderRadius: radius.sm,
-    borderWidth: 1,
-    borderColor: '#FFCDD2',
     paddingHorizontal: 8,
     paddingVertical: 3,
   },
-  closeLinkText: { fontSize: 11, fontWeight: '600', color: '#C62828' },
+  closeLinkText: { fontSize: 11, fontWeight: '600', color: colors.white },
 });
