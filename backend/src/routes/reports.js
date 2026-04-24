@@ -40,7 +40,7 @@ router.post('/aggregate/:questionListId', async (req, res) => {
          FROM reports r
          JOIN interview_sessions is2 ON r.interview_session_id = is2.id
          WHERE is2.question_list_id = $1
-           AND r.type = 'individual'
+           AND (r.type = 'individual' OR r.type IS NULL)
            AND r.status = 'completed'
            AND r.guest_id = $2`,
         [questionListId, req.guestId]
@@ -59,7 +59,8 @@ router.post('/aggregate/:questionListId', async (req, res) => {
       const { rows } = await client.query(
         `SELECT s.input_context FROM question_lists ql
          JOIN sessions s ON ql.session_id = s.id
-         WHERE ql.id = $1 AND ql.guest_id = $2`,
+         JOIN projects p ON s.project_id = p.id
+         WHERE ql.id = $1 AND p.guest_id = $2`,
         [questionListId, req.guestId]
       );
       return rows[0];
