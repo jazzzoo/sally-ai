@@ -215,10 +215,10 @@ function CompletedAggregateReport({ report }) {
 
 function DecisionBadge({ recommendation }) {
   const map = {
-    continue:         { label: 'Continue Interviewing',    bg: '#E3F2FD', color: '#1565C0' },
-    narrow_icp:       { label: 'Narrow ICP',               bg: '#F3E5F5', color: '#6A1B9A' },
-    pivot:            { label: 'Pivot',                    bg: '#FFF8E1', color: '#F57C00' },
-    move_to_solution: { label: 'Move to Solution Interview', bg: '#E8F5E9', color: '#2E7D32' },
+    continue:         { label: 'Continue Interviewing',      bg: colors.surface, color: colors.primary },
+    narrow_icp:       { label: 'Narrow ICP',                 bg: colors.surface, color: colors.primaryMid },
+    pivot:            { label: 'Pivot',                      bg: colors.surface, color: colors.primaryEnd },
+    move_to_solution: { label: 'Move to Solution Interview', bg: colors.surface, color: colors.textPrimary },
   };
   const cfg = map[recommendation] || { label: recommendation, bg: colors.border, color: colors.textSecondary };
   return (
@@ -231,9 +231,9 @@ function DecisionBadge({ recommendation }) {
 
 function VerdictBadge({ status }) {
   const map = {
-    confirmed: { label: 'Confirmed ✓',    bg: '#E8F5E9', color: '#2E7D32' },
-    mixed:     { label: 'Mixed',          bg: '#FFF8E1', color: '#F57C00' },
-    rejected:  { label: 'Not validated',  bg: '#FFEBEE', color: '#C62828' },
+    confirmed: { label: 'Confirmed ✓',   bg: colors.surface, color: colors.primary },
+    mixed:     { label: 'Mixed',         bg: colors.surface, color: colors.primaryMid },
+    rejected:  { label: 'Not validated', bg: colors.surface, color: colors.primaryEnd },
   };
   const cfg = map[status] || map.mixed;
   return (
@@ -245,9 +245,9 @@ function VerdictBadge({ status }) {
 
 function EvidenceBadge({ level }) {
   const map = {
-    strong: { label: 'Strong evidence', bg: '#E3F2FD', color: '#1565C0' },
-    medium: { label: 'Medium evidence', bg: '#F3E5F5', color: '#6A1B9A' },
-    weak:   { label: 'Weak evidence',   bg: '#FAFAFA', color: '#757575' },
+    strong: { label: 'Strong evidence', bg: colors.background, color: colors.textPrimary },
+    medium: { label: 'Medium evidence', bg: colors.background, color: colors.textSecondary },
+    weak:   { label: 'Weak evidence',   bg: colors.background, color: colors.textDisabled },
   };
   const cfg = map[level] || map.weak;
   return (
