@@ -15,8 +15,9 @@ import { colors }      from './src/theme';
 import IntroScreen     from './src/screens/IntroScreen';
 import CreateScreen    from './src/screens/CreateScreen';
 import QuestionsScreen from './src/screens/QuestionsScreen';
-import InterviewScreen from './src/screens/InterviewScreen';
-import ReportScreen    from './src/screens/ReportScreen';
+import InterviewScreen        from './src/screens/InterviewScreen';
+import ReportScreen          from './src/screens/ReportScreen';
+import AggregateReportScreen from './src/screens/AggregateReportScreen';
 // GenerateScreen 제거 — CreateScreen에 통합됨
 
 const Stack = createNativeStackNavigator();
@@ -26,17 +27,18 @@ const linking = {
   prefixes: [],
   config: {
     screens: {
-      Intro:     '',
-      Create:    'create',
-      Questions: 'questions',
-      Interview: 'interview/:token',
-      Report:    'report/:reportId',
+      Intro:           '',
+      Create:          'create',
+      Questions:       'questions',
+      Interview:       'interview/:token',
+      Report:          'report/:reportId',
+      AggregateReport: 'report/aggregate/:questionListId',
     },
   },
 };
 
 // NavBar를 숨길 라우트
-const HIDDEN_NAVBAR_ROUTES = new Set(['Interview', 'Report']);
+const HIDDEN_NAVBAR_ROUTES = new Set(['Interview', 'Report', 'AggregateReport']);
 
 // 웹 스크롤바 커스텀 CSS 주입
 if (typeof document !== 'undefined') {
@@ -129,8 +131,9 @@ export default function App() {
               <Stack.Screen name="Intro"     component={IntroScreen} />
               <Stack.Screen name="Create"    component={CreateScreen} />
               <Stack.Screen name="Questions" component={QuestionsScreen} />
-              <Stack.Screen name="Interview" component={InterviewScreen} />
-              <Stack.Screen name="Report"    component={ReportScreen} />
+              <Stack.Screen name="Interview"       component={InterviewScreen} />
+              <Stack.Screen name="Report"          component={ReportScreen} />
+              <Stack.Screen name="AggregateReport" component={AggregateReportScreen} />
             </Stack.Navigator>
           </NavigationContainer>
 

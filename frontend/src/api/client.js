@@ -236,6 +236,8 @@ export const reportsApi = {
   list: () => apiGet('/api/reports'),
   get: (reportId) => apiGet(`/api/reports/${reportId}`),
   status: (reportId) => apiGet(`/api/reports/${reportId}/status`),
+  generateAggregate: (questionListId) => apiPost(`/api/reports/aggregate/${questionListId}`, {}),
+  getAggregate: (questionListId) => apiGet(`/api/reports/aggregate/${questionListId}`),
 };
 
 // 헬스체크

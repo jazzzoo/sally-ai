@@ -46,6 +46,8 @@ export default function QuestionsPanel({ scrollRef, style }) {
   const [closingSessionId, setClosingSessionId] = useState(null);
   const [closeConfirmVisible, setCloseConfirmVisible] = useState(false);
   const [interviewPanelOpen, setInterviewPanelOpen] = useState(false);
+  const [aggregateReport, setAggregateReport] = useState(null);
+  const [isGeneratingAggregate, setIsGeneratingAggregate] = useState(false);
   const slideAnim = useRef(new Animated.Value(300)).current;
 
   function openInterviewPanel() {
@@ -72,15 +74,22 @@ export default function QuestionsPanel({ scrollRef, style }) {
       const completedIds = sessions
         .filter((s) => s.status === 'completed')
         .map((s) => s.id);
-      if (completedIds.length === 0) return;
-      const rptRes = await reportsApi.list();
-      const rptMap = {};
-      for (const r of (rptRes.data || [])) {
-        if (completedIds.includes(r.interview_session_id)) {
-          rptMap[r.interview_session_id] = r;
+      if (completedIds.length > 0) {
+        const rptRes = await reportsApi.list();
+        const rptMap = {};
+        for (const r of (rptRes.data || [])) {
+          if (completedIds.includes(r.interview_session_id)) {
+            rptMap[r.interview_session_id] = r;
+          }
         }
+        setReports(rptMap);
       }
-      setReports(rptMap);
+      try {
+        const aggRes = await reportsApi.getAggregate(listId);
+        setAggregateReport(aggRes.data);
+      } catch (_) {
+        setAggregateReport(null);
+      }
     } catch (_) {}
   }, [listId]);
 
@@ -377,6 +386,47 @@ export default function QuestionsPanel({ scrollRef, style }) {
                 })
               )}
             </ScrollView>
+
+            {/* 종합 리포트 버튼 */}
+            {(() => {
+              const completedCount = interviewSessions.filter(s => s.status === 'completed').length;
+              if (completedCount < 2) return null;
+              const aggStatus = aggregateReport?.status;
+              const isGenerating = isGeneratingAggregate || aggStatus === 'generating' || aggStatus === 'pending';
+              const isReady = aggStatus === 'completed';
+
+              async function handleAggregatePress() {
+                if (isReady) {
+                  closeInterviewPanel();
+                  navigation.navigate('AggregateReport', { questionListId: listId });
+                  return;
+                }
+                setIsGeneratingAggregate(true);
+                try {
+                  await reportsApi.generateAggregate(listId);
+                  closeInterviewPanel();
+                  navigation.navigate('AggregateReport', { questionListId: listId });
+                } catch (err) {
+                  Alert.alert('Error', err.message || 'Failed to generate overall report.');
+                } finally {
+                  setIsGeneratingAggregate(false);
+                }
+              }
+
+              return (
+                <View style={styles.aggregateBtnContainer}>
+                  <TouchableOpacity
+                    style={[styles.aggregateBtn, isGenerating && { opacity: 0.6 }]}
+                    onPress={handleAggregatePress}
+                    disabled={isGenerating}
+                  >
+                    <Text style={styles.aggregateBtnText}>
+                      {isGenerating ? 'Generating Overall Report...' : isReady ? 'View Overall Report →' : '✦ Generate Overall Report'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              );
+            })()}
           </Animated.View>
         </View>
       </Modal>
@@ -865,6 +915,22 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   viewReportText: { fontSize: 12, fontWeight: '600', color: colors.white },
+  aggregateBtnContainer: {
+    padding: spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  aggregateBtn: {
+    backgroundColor: colors.textSecondary,
+    borderRadius: radius.sm,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  aggregateBtnText: {
+    ...textStyles.bodyS,
+    color: colors.white,
+    fontWeight: '600',
+  },
   closeLinkBtn: {
     backgroundColor: colors.textSecondary,
     borderRadius: radius.sm,
