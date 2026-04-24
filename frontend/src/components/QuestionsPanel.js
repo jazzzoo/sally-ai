@@ -469,16 +469,15 @@ function ReportBadge({ status, reportStatus }) {
     const isActive = status === 'active' || status === 'in_progress';
     const label = isActive ? 'Active' : 'Closed';
     const bg = isActive ? '#E8F4FD' : '#F5F5F5';
-    const color = isActive ? '#1976D2' : '#9E9E9E';
-    return <View style={[styles.badge, { backgroundColor: bg }]}><Text style={[styles.badgeText, { color }]}>{label}</Text></View>;
+    return <View style={[styles.badge, { backgroundColor: bg }]}><Text style={[styles.badgeText, { color: colors.textSecondary }]}>{label}</Text></View>;
   }
   if (!reportStatus || reportStatus === 'pending' || reportStatus === 'generating') {
-    return <View style={[styles.badge, { backgroundColor: '#FFF8E1' }]}><Text style={[styles.badgeText, { color: '#F57C00' }]}>Generating...</Text></View>;
+    return <View style={[styles.badge, { backgroundColor: '#FFF8E1' }]}><Text style={[styles.badgeText, { color: colors.textSecondary }]}>Generating...</Text></View>;
   }
   if (reportStatus === 'failed') {
-    return <View style={[styles.badge, { backgroundColor: '#FFEBEE' }]}><Text style={[styles.badgeText, { color: '#C62828' }]}>Failed</Text></View>;
+    return <View style={[styles.badge, { backgroundColor: '#FFEBEE' }]}><Text style={[styles.badgeText, { color: colors.textSecondary }]}>Failed</Text></View>;
   }
-  return <View style={[styles.badge, { backgroundColor: '#E8F5E9' }]}><Text style={[styles.badgeText, { color: '#2E7D32' }]}>Report Ready</Text></View>;
+  return <View style={[styles.badge, { backgroundColor: '#E8F5E9' }]}><Text style={[styles.badgeText, { color: colors.textSecondary }]}>Report Ready</Text></View>;
 }
 
 // ── 리액션 행 ──────────────────────────────────────────────────
@@ -755,14 +754,15 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: spacing.md,
     paddingTop: 48,
-    paddingBottom: spacing.md,
+    paddingBottom: 8,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
   slidePanelTitle: {
-    ...textStyles.bodyM,
-    fontWeight: '700',
-    color: colors.textPrimary,
+    ...textStyles.body,
+    fontSize: 26,
+    fontWeight: '400',
+    color: colors.textSecondary,
   },
   slidePanelClose: {
     padding: 8,
@@ -797,7 +797,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
   },
   sessionInfo: { flex: 1 },
-  sessionName: { ...textStyles.bodyS, color: colors.textPrimary, fontWeight: '500' },
+  sessionName: { ...textStyles.bodyS, color: colors.textSecondary, fontWeight: '500' },
   sessionDate: { ...textStyles.caption, color: colors.textDisabled, marginTop: 2 },
   sessionRight: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
   badge: {
