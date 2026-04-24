@@ -350,12 +350,9 @@ export default function QuestionsPanel({ scrollRef, style }) {
                         <Text style={styles.sessionName}>{s.respondent_name || 'Pending...'}</Text>
                         {isActive && (
                           <View style={styles.dotsRow}>
-                            {Array.from({ length: 10 }).map((_, i) => {
-                              const filled = i < (s.completed_sections?.length ?? 0) * 2;
-                              const fillColor = filled
-                                ? (i < 4 ? colors.primary : i < 7 ? colors.primaryMid : colors.primaryEnd)
-                                : colors.border;
-                              return <View key={i} style={[styles.dot, { backgroundColor: fillColor }]} />;
+                            {Array.from({ length: 20 }).map((_, i) => {
+                              const filled = i < (s.completed_sections?.length ?? 0) * 4;
+                              return <View key={i} style={[styles.dot, { backgroundColor: filled ? colors.primaryMid : colors.border }]} />;
                             })}
                           </View>
                         )}
@@ -843,6 +840,8 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     backgroundColor: colors.surface,
     borderRadius: radius.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
     paddingVertical: 10,
     paddingHorizontal: spacing.md,
   },
