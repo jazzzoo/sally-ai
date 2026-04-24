@@ -111,6 +111,7 @@ export default function App() {
 
           <NavigationContainer
             ref={navRef}
+            documentTitle={{ enabled: false }}
             linking={linking}
             onStateChange={(state) => {
               const route = state?.routes?.[state.index];
