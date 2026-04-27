@@ -348,7 +348,7 @@ export default function QuestionsPanel({ scrollRef, style }) {
                           setLinkModal({
                             visible: true,
                             url: s.link_token
-                              ? `https://sally-ai-gamma.vercel.app/interview/${s.link_token}`
+                              ? `https://nitor8.vercel.app/interview/${s.link_token}`
                               : s.url || null,
                           });
                           return;
@@ -515,7 +515,7 @@ export default function QuestionsPanel({ scrollRef, style }) {
       <ModalDialog
         visible={showFeedbackModal}
         title="Before you export..."
-        message={["We'd love your feedback!", "It takes just 2 minutes,", "and helps us improve Sally.ai."]}
+        message={["We'd love your feedback!", "It takes just 2 minutes,", "and helps us improve Nitor8."]}
         mode="confirm"
         confirmLabel="✦ Share Feedback"
         cancelLabel="Skip & Export"

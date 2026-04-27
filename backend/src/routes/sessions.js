@@ -598,7 +598,7 @@ router.get('/:id/generate-stream', authenticateGuest, async (req, res) => {
   } catch (err) {
     console.error('[Sessions] SSE stream error:', err.message);
     if (!res.writableEnded) {
-      sendEvent('error', { code: 'AI_ERROR', message: 'Sally가 바빠요. 잠시 후 다시 시도해주세요.' });
+      sendEvent('error', { code: 'AI_ERROR', message: 'Nitor가 바빠요. 잠시 후 다시 시도해주세요.' });
       sendEvent('done', {});
       res.end();
     }

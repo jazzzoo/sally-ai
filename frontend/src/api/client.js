@@ -1,5 +1,5 @@
 /// frontend/src/api/client.js
-// Sally.ai API 클라이언트
+// Nitor8 API 클라이언트
 // - 모든 요청에 x-guest-id 헤더 자동 포함
 // - SSE 스트리밍 지원 (react-native-sse)
 // - 공통 에러 처리

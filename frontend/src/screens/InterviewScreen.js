@@ -85,9 +85,9 @@ function NamePrompt({ onSubmit, isLoading }) {
         >
           <Text style={styles.namePromptLogoIcon}>✦</Text>
         </LinearGradient>
-        <Text style={[styles.namePromptTitle, { fontSize: isMobile ? 17 : 20 }]}>Welcome to Sally.ai</Text>
+        <Text style={[styles.namePromptTitle, { fontSize: isMobile ? 17 : 20 }]}>Welcome to Nitor8</Text>
         <Text style={styles.namePromptSubtitle}>
-          What's your first name? Sally will use it during the interview.
+          What's your first name? Nitor will use it during the interview.
         </Text>
         <TextInput
           style={styles.nameInput}
@@ -132,7 +132,7 @@ export default function InterviewScreen({ route }) {
 
   useFocusEffect(
     React.useCallback(() => {
-      if (typeof document !== 'undefined') document.title = 'Sally - Interview';
+      if (typeof document !== 'undefined') document.title = 'Nitor8 - Interview';
     }, [])
   );
 
@@ -278,7 +278,7 @@ export default function InterviewScreen({ route }) {
         >
           <Text style={styles.headerLogoIcon}>✦</Text>
         </LinearGradient>
-        <Text style={styles.headerTitle}>Sally.ai</Text>
+        <Text style={styles.headerTitle}>Nitor8</Text>
         {isCompleted && (
           <View style={styles.completedBadge}>
             <Text style={styles.completedBadgeText}>Completed</Text>

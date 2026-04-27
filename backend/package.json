@@ -1,7 +1,7 @@
 {
-  "name": "sally-ai-backend",
+  "name": "nitor8-backend",
   "version": "1.0.0",
-  "description": "Sally.ai 백엔드 API 서버",
+  "description": "Nitor8 백엔드 API 서버",
   "main": "src/app.js",
   "scripts": {
     "dev": "nodemon src/app.js",

@@ -1,4 +1,4 @@
-# Sally.ai
+# Nitor8
 
 > 린 고객개발 4세션 구조를 내장한 인터뷰 질문 생성 AI
 
@@ -57,7 +57,7 @@ curl http://localhost:3000/health
 ## 폴더 구조
 
 ```
-sally-ai/
+nitor8/
 ├── .devcontainer/
 │   └── devcontainer.json     Codespaces 환경 설정
 │
@@ -118,7 +118,7 @@ sally-ai/
 | GET | /question-lists/:id/export | 내보내기 |
 
 > Vercel 배포 후에는 모든 경로 앞에 `/api` 추가됨
-> 예: `https://sally-api.vercel.app/api/health`
+> 예: `https://nitor8.vercel.app/api/health`
 
 ---
 

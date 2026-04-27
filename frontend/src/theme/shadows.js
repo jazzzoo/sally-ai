@@ -1,5 +1,5 @@
 // frontend/src/theme/shadows.js
-// Sally.ai 디자인 시스템 — Neumorphism Shadow 토큰
+// Nitor8 디자인 시스템 — Neumorphism Shadow 토큰
 
 import { colors } from './colors';
 

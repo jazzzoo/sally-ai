@@ -1,4 +1,4 @@
-# CLAUDE.md — Sally.ai Project Context
+# CLAUDE.md — Nitor8 Project Context (구 Sally.ai)
 
 > 이 파일을 먼저 읽고 작업을 시작하세요.
 > 모든 코드 작업은 이 파일의 규칙을 따릅니다.
@@ -7,12 +7,12 @@
 
 ## 제품 개요
 
-**Sally.ai** — 비영어권 1~5인 창업자가 영어권 고객(US/UK)을 대상으로
+**Nitor8** — 비영어권 1~5인 창업자가 영어권 고객(US/UK)을 대상으로
 고객개발 인터뷰를 할 때 도와주는 AI SaaS.
 
 **핵심 가치:** "Stop worrying about your English, focus on listening."
 
-**궁극 목표:** 아이디어 입력 → Sally가 인터뷰 설계 + 진행 + 리포트 + 다음 액션까지 전부 자동화.
+**궁극 목표:** 아이디어 입력 → Nitor8가 인터뷰 설계 + 진행 + 리포트 + 다음 액션까지 전부 자동화.
 
 ---
 
@@ -22,7 +22,7 @@
 
 핵심 기능 3가지:
 1. 인터뷰 링크 생성 (창업자가 생성 → 응답자에게 공유)
-2. AI 멀티턴 텍스트 인터뷰 (응답자가 링크 열면 Sally AI와 1:1 채팅)
+2. AI 멀티턴 텍스트 인터뷰 (응답자가 링크 열면 Nitor AI와 1:1 채팅)
 3. 자동 리포트 생성 (인터뷰 완료 후 Claude API로 자동 생성)
 
 **Go/No-Go 기준:**
@@ -35,8 +35,8 @@
 ## 기술 스택
 
 ```
-Frontend:  React Native / Expo Web → Vercel (sally-ai-gamma.vercel.app)
-Backend:   Node.js / Express → Render (sally-ai-backend.onrender.com)
+Frontend:  React Native / Expo Web → Vercel (nitor8.vercel.app)
+Backend:   Node.js / Express → Render (nitor8-backend.onrender.com)
 Database:  PostgreSQL → Railway
 AI:        Claude API (claude-haiku-4-5-20251001 primary, claude-sonnet-4-6 fallback)
 Auth:      Guest ID 기반 (x-guest-id 헤더, UUID v4)
@@ -48,7 +48,7 @@ Module:    ES Modules (import/export, NOT require/CommonJS)
 ## 프로젝트 구조
 
 ```
-sally-ai/
+nitor8/
 ├── frontend/
 │   ├── App.js
 │   ├── src/
@@ -316,7 +316,7 @@ userSaidStop                    → wrap_up
 ## 응답자 인터뷰 링크
 
 ```
-URL:    https://sally-ai-gamma.vercel.app/interview/:link_token
+URL:    https://nitor8.vercel.app/interview/:link_token
 인증:   없음 (공개)
 만료:   30일
 재접속: 가능 (마지막 턴부터 이어서)

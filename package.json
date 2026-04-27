@@ -1,7 +1,7 @@
 {
-  "name": "sally-ai",
+  "name": "nitor8",
   "version": "1.0.0",
-  "description": "Sally.ai - 린 고객개발 인터뷰 질문 생성 AI",
+  "description": "Nitor8 - 린 고객개발 인터뷰 질문 생성 AI",
   "private": true,
   "scripts": {
     "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",

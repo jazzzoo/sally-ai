@@ -1,5 +1,5 @@
 // frontend/src/store/useStore.js
-// Sally.ai 전역 상태 (Zustand + AsyncStorage persist)
+// Nitor8 전역 상태 (Zustand + AsyncStorage persist)
 //
 // 슬라이스 구성:
 //   auth       — guestId 초기화
@@ -132,7 +132,7 @@ const useStore = create(
     }),
 
     {
-      name: 'sally-store-v1',
+      name: 'nitor8-store-v1',
       storage: createJSONStorage(() => AsyncStorage),
       partialize: (state) => ({
         sessionForm: state.sessionForm,

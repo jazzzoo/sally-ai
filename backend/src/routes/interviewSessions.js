@@ -75,7 +75,7 @@ router.post('/', authenticateGuest, async (req, res) => {
     });
 
     const session = result.rows[0];
-    const appUrl = process.env.APP_URL || 'https://sally-ai-gamma.vercel.app';
+    const appUrl = process.env.APP_URL || 'https://nitor8.vercel.app';
 
     return res.status(201).json({
       success: true,
@@ -139,7 +139,7 @@ router.get('/', authenticateGuest, async (req, res) => {
       );
     });
 
-    const appUrl = process.env.APP_URL || 'https://sally-ai-gamma.vercel.app';
+    const appUrl = process.env.APP_URL || 'https://nitor8.vercel.app';
     const sessions = result.rows.map((s) => ({
       ...s,
       url: `${appUrl}/interview/${s.link_token}`,

@@ -10,7 +10,7 @@ const { generateQuestions } = require('../src/services/aiService');
 const testInput = {
   business_summary: `초기 스타트업 창업자들이 고객 인터뷰를 어려워합니다.
 어떤 질문을 해야 할지 모르고, 린 스타트업 원칙에 맞는 질문을 만드는 데
-평균 2~3시간이 걸립니다. Sally.ai는 AI가 자동으로 검증된 인터뷰 질문을
+평균 2~3시간이 걸립니다. Nitor8는 AI가 자동으로 검증된 인터뷰 질문을
 생성해주는 서비스입니다.`,
   persona: '시드 단계 이전의 초기 스타트업 창업자 (1~3인 팀)',
   style: '기본',
@@ -19,7 +19,7 @@ const testInput = {
 
 async function runTest() {
   console.log('='.repeat(50));
-  console.log('Sally.ai Day 3 — Claude API 테스트');
+  console.log('Nitor8 Day 3 — Claude API 테스트');
   console.log('='.repeat(50));
   console.log('');
   console.log('입력:');

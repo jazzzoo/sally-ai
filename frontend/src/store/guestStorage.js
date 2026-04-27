@@ -2,7 +2,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Crypto from 'expo-crypto';
 
-const GUEST_ID_KEY = 'sally_guest_id';
+const GUEST_ID_KEY = 'nitor8_guest_id';
 
 function genUUID() {
   try {

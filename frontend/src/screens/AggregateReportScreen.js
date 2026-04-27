@@ -16,7 +16,7 @@ export default function AggregateReportScreen({ route, navigation }) {
 
   useFocusEffect(
     React.useCallback(() => {
-      if (typeof document !== 'undefined') document.title = 'Sally - Overall Report';
+      if (typeof document !== 'undefined') document.title = 'Nitor8 - Overall Report';
     }, [])
   );
 

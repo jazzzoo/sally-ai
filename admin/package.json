@@ -1,7 +1,7 @@
 {
-  "name": "sally-ai-admin",
+  "name": "nitor8-admin",
   "version": "1.0.0",
-  "description": "Sally.ai 관리자 대시보드 (Vite + React)",
+  "description": "Nitor8 관리자 대시보드 (Vite + React)",
   "type": "module",
   "scripts": {
     "dev": "vite",

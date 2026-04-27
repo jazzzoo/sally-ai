@@ -1,5 +1,5 @@
 // frontend/src/theme/typography.js
-// Sally.ai 디자인 시스템 — 타이포그래피 + 스페이싱 + 래디우스
+// Nitor8 디자인 시스템 — 타이포그래피 + 스페이싱 + 래디우스
 
 import { Platform } from 'react-native';
 

@@ -1,5 +1,5 @@
 {
-  "name": "Sally.ai",
+  "name": "Nitor8",
   "forwardPorts": [3000, 8081],
   "portsAttributes": {
     "3000": {

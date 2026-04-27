@@ -31,7 +31,7 @@ const CYCLE_MS = 2600; // 한 항목당 표시 시간
 
 // CSS keyframes 웹 주입 — 한 번만
 if (typeof document !== 'undefined') {
-  const styleId = 'sally-marquee-style';
+  const styleId = 'nitor8-marquee-style';
   if (!document.getElementById(styleId)) {
     const totalItems = HINTS.length;
     const el = document.createElement('style');
@@ -39,12 +39,12 @@ if (typeof document !== 'undefined') {
     // 각 항목이 올라가며 1줄씩 보임
     // translateY: 0 → -(N * ITEM_HEIGHT)
     el.textContent = `
-      @keyframes sallyMarquee {
+      @keyframes nitor8Marquee {
         0%          { transform: translateY(0px); }
         100%        { transform: translateY(-${totalItems * ITEM_HEIGHT}px); }
       }
-      .sally-marquee-track {
-        animation: sallyMarquee ${CYCLE_MS * totalItems}ms linear infinite;
+      .nitor8-marquee-track {
+        animation: nitor8Marquee ${CYCLE_MS * totalItems}ms linear infinite;
       }
     `;
     document.head.appendChild(el);
@@ -77,7 +77,7 @@ function MarqueeText() {
   if (isWeb) {
     return (
       <div style={{ height: ITEM_HEIGHT, overflow: 'hidden', position: 'relative' }}>
-        <div className="sally-marquee-track">
+        <div className="nitor8-marquee-track">
           {tripled.map((hint, i) => (
             <div key={i} style={{
               height: ITEM_HEIGHT,
@@ -131,7 +131,7 @@ export default function IntroScreen({ navigation }) {
 
   useFocusEffect(
     React.useCallback(() => {
-      if (typeof document !== 'undefined') document.title = 'Sally';
+      if (typeof document !== 'undefined') document.title = 'Nitor8';
       setNavTitle('');   // 인트로에선 타이틀 비움
     }, [])
   );
@@ -151,7 +151,7 @@ export default function IntroScreen({ navigation }) {
             >
               <Text style={styles.logoIcon}>✦</Text>
             </LinearGradient>
-            <Text style={styles.appName}>Sally.ai</Text>
+            <Text style={styles.appName}>Nitor8</Text>
           </View>
 
           {/* 헤드라인 */}
@@ -169,7 +169,7 @@ export default function IntroScreen({ navigation }) {
           <View style={styles.promptBox}>
             <View style={styles.promptHeader}>
               <View style={styles.promptDot} />
-              <Text style={styles.promptLabel}>Sally can help you with</Text>
+              <Text style={styles.promptLabel}>Nitor8 can help you with</Text>
             </View>
             <MarqueeText />
           </View>

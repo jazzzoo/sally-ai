@@ -2,8 +2,8 @@
 // 응답자용 공개 인터뷰 API (인증 없음)
 //
 // GET  /api/interview/:token           — 세션 정보 + 기존 대화 조회 (재접속)
-// POST /api/interview/:token/start     — 이름 등록 + Sally 첫 인사 생성
-// POST /api/interview/:token/chat      — 응답 전송 + Sally 다음 메시지 수신
+// POST /api/interview/:token/start     — 이름 등록 + Nitor 첫 인사 생성
+// POST /api/interview/:token/chat      — 응답 전송 + Nitor 다음 메시지 수신
 // POST /api/interview/:token/heartbeat — 마지막 활동 시간 갱신
 
 import { Router } from 'express';
@@ -209,7 +209,7 @@ DO NOT generate any other question.`;
 ` : '';
 
   return `[ROLE]
-You are Sally, an expert customer development interviewer working on behalf of a non-native English founder.
+You are Nitor, an expert customer development interviewer working on behalf of a non-native English founder.
 The respondent is a potential customer. Listen carefully and follow the guide exactly.
 
 [BUSINESS CONTEXT]
@@ -243,7 +243,7 @@ Probes used: ${followupCount}/${maxFollowups}
 
 [OUTPUT — RESPOND WITH JSON ONLY, NO OTHER TEXT]
 {
-  "utterance": "Sally's exact words to send to the respondent",
+  "utterance": "Nitor's exact words to send to the respondent",
   "answered_current_question": false,
   "needs_probe": false,
   "detected_exit_signal": "none",
@@ -379,7 +379,7 @@ async function generateWrapUpMessage(respondentName, businessContext) {
     const response = await anthropic.messages.create({
       model: process.env.AI_PRIMARY_MODEL || 'claude-haiku-4-5-20251001',
       max_tokens: 200,
-      system: `You are Sally, a warm AI interviewer wrapping up a customer development interview.
+      system: `You are Nitor, a warm AI interviewer wrapping up a customer development interview.
 Write 2-3 sentences: thank the respondent sincerely, then optionally ask if there's anything else to share.
 Be genuine and conversational. No bullet points or lists.`,
       messages: [{
@@ -412,7 +412,7 @@ async function generateReport(interviewSessionId, businessContext) {
     );
 
     const transcript = turns.rows
-      .map((t) => `${t.role === 'assistant' ? 'Sally' : 'Respondent'} [${t.section}]: ${t.content}`)
+      .map((t) => `${t.role === 'assistant' ? 'Nitor' : 'Respondent'} [${t.section}]: ${t.content}`)
       .join('\n\n');
 
     const systemPrompt = `You are an expert Lean Customer Development analyst trained in the Mom Test and Jobs-to-be-Done frameworks.
@@ -600,7 +600,7 @@ router.get('/:token', async (req, res) => {
 
 // ─────────────────────────────────────────────────────────────────
 // POST /api/interview/:token/start
-// 이름 등록 + Sally 첫 인사 생성
+// 이름 등록 + Nitor 첫 인사 생성
 // 재접속: completed_sections 요약 + 최근 6턴 반환
 // ─────────────────────────────────────────────────────────────────
 router.post('/:token/start', async (req, res) => {
@@ -768,7 +768,7 @@ Respond in JSON: {"utterance": "greeting + first question", "answered_current_qu
 
 // ─────────────────────────────────────────────────────────────────
 // POST /api/interview/:token/chat
-// 응답자 메시지 전송 + Sally 다음 메시지 수신
+// 응답자 메시지 전송 + Nitor 다음 메시지 수신
 // Body: { content, client_message_id?, respondent_session_id? }
 // ─────────────────────────────────────────────────────────────────
 router.post('/:token/chat', async (req, res) => {
@@ -1232,7 +1232,7 @@ router.post('/:token/chat', async (req, res) => {
     console.error('[Interview] POST /:token/chat error:', err.message);
     return res.status(500).json({
       success: false,
-      error: { code: 'INTERNAL_ERROR', message: 'Sally가 바빠요. 잠시 후 다시 시도해주세요.' },
+      error: { code: 'INTERNAL_ERROR', message: 'Nitor가 바빠요. 잠시 후 다시 시도해주세요.' },
     });
   }
 });

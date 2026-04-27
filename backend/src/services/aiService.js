@@ -185,7 +185,7 @@ async function generateQuestions(sessionType, inputContext, dynamicInstructions 
         success: false,
         error: {
           code:    'AI_TIMEOUT',
-          message: 'Sally가 바빠요. 잠시 후 다시 시도해주세요.',
+          message: 'Nitor가 바빠요. 잠시 후 다시 시도해주세요.',
           detail:  fallbackError.message,
         },
       };

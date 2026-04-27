@@ -19,7 +19,7 @@ const PORT = process.env.PORT || 3000;
 // 미들웨어
 // ─────────────────────────────────────────
 const ALLOWED_ORIGINS = [
-  'https://sally-ai-gamma.vercel.app',
+  'https://nitor8.vercel.app',
   'http://localhost:8081',
   'http://localhost:19006',
   ...(process.env.ALLOWED_ORIGINS?.split(',').map((o) => o.trim()).filter(Boolean) || []),
@@ -133,7 +133,7 @@ app.use((err, req, res, _next) => {
 // 서버 시작
 // ─────────────────────────────────────────
 app.listen(PORT, async () => {
-  console.log(`\n🚀 Sally.ai Backend — port ${PORT}`);
+  console.log(`\n🚀 Nitor8 Backend — port ${PORT}`);
   try {
     await checkConnection();
     console.log('✅ PostgreSQL 연결 성공');

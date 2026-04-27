@@ -31,7 +31,7 @@ export default function NavBar({ onLogoPress }) {
           >
             <Text style={styles.logoIcon}>✦</Text>
           </LinearGradient>
-          <Text style={styles.logoText}>Sally.ai</Text>
+          <Text style={styles.logoText}>Nitor8</Text>
         </TouchableOpacity>
 
         {/* 동적 타이틀 — 로고 오른쪽 30px */}

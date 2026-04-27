@@ -124,7 +124,7 @@ export default function CreateScreen({ navigation }) {
 
   useFocusEffect(
     React.useCallback(() => {
-      if (typeof document !== 'undefined') document.title = 'Sally - Create';
+      if (typeof document !== 'undefined') document.title = 'Nitor8 - Create';
     }, [])
   );
 
@@ -301,7 +301,7 @@ export default function CreateScreen({ navigation }) {
               setNavTitle(list.title || businessSummary.trim().slice(0, 24));
 
               // 카드 fade-in(300ms) 완료 여유 시간 + REST API 레이턴시로 이미 충분히 대기됨.
-              // 추가 300ms로 [Sally thinking...] 자연스러운 소멸 시간 확보.
+              // 추가 300ms로 [Nitor thinking...] 자연스러운 소멸 시간 확보.
               await new Promise((resolve) => setTimeout(resolve, 300));
 
               setIsGenerating(false);

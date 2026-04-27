@@ -17,7 +17,7 @@ export default function ReportScreen({ route, navigation }) {
 
   useFocusEffect(
     React.useCallback(() => {
-      if (typeof document !== 'undefined') document.title = 'Sally - Report';
+      if (typeof document !== 'undefined') document.title = 'Nitor8 - Report';
     }, [])
   );
 

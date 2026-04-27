@@ -1,5 +1,5 @@
 // frontend/src/theme/colors.js
-// Sally.ai 디자인 시스템 — 컬러 토큰 (확정)
+// Nitor8 디자인 시스템 — 컬러 토큰 (확정)
 
 export const lightColors = {
   background:    '#E9EEF2',

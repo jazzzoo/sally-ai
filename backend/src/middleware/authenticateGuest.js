@@ -54,7 +54,7 @@ export const authenticateGuest = async (req, res, next) => {
         success: false,
         error: {
           code: 'FORBIDDEN',
-          message: '접근이 제한된 계정입니다. 문의: support@sally.ai',
+          message: '접근이 제한된 계정입니다. 문의: support@nitor8.com',
         },
       });
     }
