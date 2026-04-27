@@ -255,6 +255,6 @@ const styles = StyleSheet.create({
     letterSpacing: 0.3,
   },
 
-  ctaWrapper: { width: 240 },
+  ctaWrapper: { maxWidth: 240, width: '100%' },
   noAccount: { fontSize: 14, color: colors.textDisabled },
 });

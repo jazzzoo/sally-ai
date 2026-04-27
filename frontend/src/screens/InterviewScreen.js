@@ -6,7 +6,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, ScrollView,
   StyleSheet, ActivityIndicator, KeyboardAvoidingView,
-  Platform, SafeAreaView,
+  Platform, SafeAreaView, useWindowDimensions,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect } from '@react-navigation/native';
@@ -19,6 +19,8 @@ const MAX_INPUT_LENGTH = 1000;
 // ── 채팅 버블 컴포넌트 ────────────────────────────────────────────
 function ChatBubble({ role, content }) {
   const isAssistant = role === 'assistant';
+  const { width: windowWidth } = useWindowDimensions();
+  const isMobile = windowWidth < 700;
   return (
     <View style={[styles.bubbleRow, isAssistant ? styles.bubbleRowLeft : styles.bubbleRowRight]}>
       {isAssistant && (
@@ -34,6 +36,7 @@ function ChatBubble({ role, content }) {
       <View style={[
         styles.bubble,
         isAssistant ? styles.bubbleAssistant : styles.bubbleUser,
+        { maxWidth: isMobile ? '88%' : '70%' },
       ]}>
         <Text style={[
           styles.bubbleText,
@@ -68,10 +71,12 @@ function TypingIndicator() {
 // ── 이름 입력 화면 ────────────────────────────────────────────────
 function NamePrompt({ onSubmit, isLoading }) {
   const [name, setName] = useState('');
+  const { width: windowWidth } = useWindowDimensions();
+  const isMobile = windowWidth < 700;
 
   return (
     <View style={styles.namePromptOverlay}>
-      <View style={styles.namePromptCard}>
+      <View style={[styles.namePromptCard, { padding: isMobile ? 16 : 28 }]}>
         <LinearGradient
           colors={gradientColors}
           start={{ x: 0, y: 0 }}
@@ -80,7 +85,7 @@ function NamePrompt({ onSubmit, isLoading }) {
         >
           <Text style={styles.namePromptLogoIcon}>✦</Text>
         </LinearGradient>
-        <Text style={styles.namePromptTitle}>Welcome to Sally.ai</Text>
+        <Text style={[styles.namePromptTitle, { fontSize: isMobile ? 17 : 20 }]}>Welcome to Sally.ai</Text>
         <Text style={styles.namePromptSubtitle}>
           What's your first name? Sally will use it during the interview.
         </Text>
@@ -122,6 +127,8 @@ function NamePrompt({ onSubmit, isLoading }) {
 // ── 메인 화면 ─────────────────────────────────────────────────────
 export default function InterviewScreen({ route }) {
   const token = route?.params?.token;
+  const { width: windowWidth } = useWindowDimensions();
+  const isMobile = windowWidth < 700;
 
   useFocusEffect(
     React.useCallback(() => {
@@ -262,7 +269,7 @@ export default function InterviewScreen({ route }) {
   return (
     <SafeAreaView style={styles.safe}>
       {/* 헤더 */}
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingHorizontal: isMobile ? 12 : 20 }]}>
         <LinearGradient
           colors={gradientColors}
           start={{ x: 0, y: 0 }}
