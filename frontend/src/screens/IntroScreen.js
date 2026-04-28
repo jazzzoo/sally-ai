@@ -3,7 +3,7 @@
 //   - 피처 카드 3개 제거
 //   - 서브텍스트 ~ CTA 사이: 프롬프트 박스 + 무한 위로 스크롤 텍스트
 
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View, Text, StyleSheet, Animated,
   useWindowDimensions,
@@ -136,8 +136,42 @@ export default function IntroScreen({ navigation }) {
     }, [])
   );
 
+  const [showBetaModal, setShowBetaModal] = useState(false);
+
+  useEffect(() => {
+    if (typeof localStorage !== 'undefined' && !localStorage.getItem('nitor8-beta-notice')) {
+      setShowBetaModal(true);
+    }
+  }, []);
+
+  function dismissBetaModal() {
+    if (typeof localStorage !== 'undefined') localStorage.setItem('nitor8-beta-notice', 'true');
+    setShowBetaModal(false);
+  }
+
+  function BetaModal() {
+    if (!showBetaModal) return null;
+    return (
+      <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: colors.overlay, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+        <div style={{ background: colors.surface, borderRadius: radius.lg, maxWidth: 400, width: '100%', padding: 28 }}>
+          <p style={{ fontSize: 11, fontWeight: 700, color: colors.textDisabled, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 8 }}>BETA</p>
+          <h2 style={{ fontSize: 20, fontWeight: 700, color: colors.textPrimary, marginBottom: 12 }}>Welcome to Nitor8 Beta</h2>
+          <ul style={{ paddingLeft: 20, color: colors.textSecondary, fontSize: 14, lineHeight: '22px', marginBottom: 20 }}>
+            <li>This is a beta version — features may change.</li>
+            <li>Currently supports Session 1 (Problem Interview) only.</li>
+            <li>Use the same browser &amp; device for best experience.</li>
+            <li>Questions or feedback? <a href="mailto:support@nitor8.com" style={{ color: colors.primary }}>support@nitor8.com</a></li>
+          </ul>
+          <button onClick={dismissBetaModal} style={{ background: `linear-gradient(90deg, ${colors.primary}, ${colors.primaryMid}, ${colors.primaryEnd})`, color: colors.white, border: 'none', borderRadius: radius.md, padding: '12px 24px', fontSize: 15, fontWeight: 600, cursor: 'pointer', width: '100%' }}>Got it →</button>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <SafeAreaView style={styles.safe}>
+    <>
+      {typeof document !== 'undefined' && <BetaModal />}
+      <SafeAreaView style={styles.safe}>
       <View style={styles.center}>
         <View style={styles.hero}>
 
@@ -178,6 +212,7 @@ export default function IntroScreen({ navigation }) {
         </View>
       </View>
     </SafeAreaView>
+    </>
   );
 }
 
