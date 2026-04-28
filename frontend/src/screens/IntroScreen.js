@@ -51,8 +51,6 @@ if (typeof document !== 'undefined') {
   }
 }
 
-const logoDark = require('../../web/assets/logodark.png');
-
 function MarqueeText() {
   // 웹: CSS animation / 네이티브: Animated fallback
   const isWeb = typeof document !== 'undefined';
@@ -158,7 +156,7 @@ export default function IntroScreen({ navigation }) {
           <p style={{ fontSize: 15, fontWeight: 700, color: colors.textDisabled, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 8 }}>BETA</p>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 32, fontWeight: 700, color: colors.textSecondary, marginBottom: 12 }}>
             <span>Welcome to </span>
-            <img src={logoDark} height={28} alt="Nitor8" />
+            <img src="/logodark.png" height={28} alt="Nitor8" />
             <span> Beta</span>
           </div>
           <ul style={{ paddingLeft: 20, color: colors.textSecondary, fontSize: 18, lineHeight: '30px', marginBottom: 20 }}>
