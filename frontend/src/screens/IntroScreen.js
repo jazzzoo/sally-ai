@@ -167,7 +167,7 @@ export default function IntroScreen({ navigation }) {
             <li>Use the same browser &amp; device for best experience.</li>
             <li>Questions or feedback? <a href="https://x.com/nitor8_hq" style={{ color: colors.primary }}>@nitor8_hq on X</a></li>
           </ul>
-          <div style={{ display: 'flex', justifyContent: 'center', marginTop: 15 }}>
+          <div style={{ display: 'flex', justifyContent: 'center', marginTop: 30 }}>
             <button onClick={dismissBetaModal} style={{ background: `linear-gradient(90deg, ${colors.primary}, ${colors.primaryMid}, ${colors.primaryEnd})`, color: colors.white, border: 'none', borderRadius: radius.md, padding: '12px 24px', fontSize: 19, fontWeight: 600, cursor: 'pointer', width: '40%' }}>Got it →</button>
           </div>
         </div>
