@@ -154,18 +154,20 @@ export default function IntroScreen({ navigation }) {
       <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: colors.overlay, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
         <div style={{ background: colors.surface, borderRadius: radius.lg, maxWidth: 520, width: '100%', padding: 40, minHeight: 550 }}>
           <p style={{ fontSize: 15, fontWeight: 700, color: colors.textDisabled, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 8 }}>BETA</p>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 32, fontWeight: 700, color: colors.textSecondary, marginBottom: 12 }}>
-            <span>Welcome to </span>
-            <img src="/logodark.png" height={28} alt="Nitor8" />
-            <span> Beta</span>
+          <div>
+            <p style={{ fontSize: 18, color: colors.textSecondary, marginBottom: 8, fontWeight: 400 }}>Welcome to</p>
+            <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8 }}>
+              <img src="/logodark.png" style={{ width: '65%', height: 'auto' }} alt="Nitor8" />
+              <span style={{ fontSize: 32, fontWeight: 700, color: colors.textSecondary }}>Beta</span>
+            </div>
           </div>
-          <ul style={{ paddingLeft: 20, color: colors.textSecondary, fontSize: 18, lineHeight: '30px', marginBottom: 20 }}>
+          <ul style={{ paddingLeft: 20, color: colors.textSecondary, fontSize: 18, lineHeight: '30px', marginTop: 24, marginBottom: 20 }}>
             <li>This is a beta version — features may change.</li>
             <li>Currently supports Session 1 (Problem Interview) only.</li>
             <li>Use the same browser &amp; device for best experience.</li>
             <li>Questions or feedback? <a href="https://x.com/nitor8_hq" style={{ color: colors.primary }}>@nitor8_hq on X</a></li>
           </ul>
-          <div style={{ display: 'flex', justifyContent: 'center', marginTop: 15 }}>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 15 }}>
             <button onClick={dismissBetaModal} style={{ background: `linear-gradient(90deg, ${colors.primary}, ${colors.primaryMid}, ${colors.primaryEnd})`, color: colors.white, border: 'none', borderRadius: radius.md, padding: '12px 24px', fontSize: 19, fontWeight: 600, cursor: 'pointer', width: '40%' }}>Got it →</button>
           </div>
         </div>
