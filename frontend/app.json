@@ -6,8 +6,7 @@
     "platforms": ["ios", "android", "web"],
     "web": {
       "favicon": "./web/assets/favicon.png",
-      "bundler": "metro",
-      "htmlTemplate": "./web/index.html"
+      "bundler": "metro"
     }
   }
 }
