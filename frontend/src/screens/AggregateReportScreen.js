@@ -204,15 +204,22 @@ export default function AggregateReportScreen({ route, navigation }) {
               style={styles.iconBtn}
             >
               {({ hovered }) => (
-                <Animated.View style={[
-                  { opacity: copyAnim },
-                  hovered && { backgroundColor: colors.background, borderRadius: radius.sm, padding: 6 },
-                ]}>
-                  {copied
-                    ? <Check size={18} color={colors.primary} />
-                    : <Copy size={18} color={hovered ? colors.textSecondary : colors.textDisabled} />
-                  }
-                </Animated.View>
+                <>
+                  {hovered && (
+                    <View style={{
+                      position: 'absolute',
+                      inset: 0,
+                      backgroundColor: colors.background,
+                      borderRadius: radius.sm,
+                    }} />
+                  )}
+                  <Animated.View style={{ opacity: copyAnim }}>
+                    {copied
+                      ? <Check size={18} color={colors.primary} />
+                      : <Copy size={18} color={hovered ? colors.textSecondary : colors.textDisabled} />
+                    }
+                  </Animated.View>
+                </>
               )}
             </Pressable>
           )}
@@ -479,7 +486,7 @@ const styles = StyleSheet.create({
   backBtn:  { width: 60 },
   backText: { fontSize: 14, color: colors.primary, fontWeight: '500' },
   actionBtns: { flexDirection: 'row', alignItems: 'center', gap: 4, minWidth: 60, justifyContent: 'flex-end' },
-  iconBtn:        { padding: 6, borderRadius: radius.sm },
+  iconBtn:        { padding: 6, borderRadius: radius.sm, overflow: 'hidden' },
   iconBtnHovered: { padding: 6, borderRadius: radius.sm, backgroundColor: colors.primaryEnd, opacity: 0.5 },
   topTitle: { ...textStyles.h3, color: colors.textSecondary },
 
