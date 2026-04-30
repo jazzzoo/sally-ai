@@ -202,10 +202,13 @@ export default function AggregateReportScreen({ route, navigation }) {
             <Pressable
               onPress={handleCopy}
               onHoverIn={() => console.log('hover in')}
-              style={({ hovered }) => [
-                styles.iconBtn,
-                hovered && styles.iconBtnHovered,
-              ]}
+              style={({ hovered }) => {
+                console.log('hovered:', hovered);
+                return [
+                  styles.iconBtn,
+                  hovered && styles.iconBtnHovered,
+                ];
+              }}
             >
               <Animated.View style={{ opacity: copyAnim }}>
                 {copied
@@ -479,7 +482,7 @@ const styles = StyleSheet.create({
   backText: { fontSize: 14, color: colors.primary, fontWeight: '500' },
   actionBtns: { flexDirection: 'row', alignItems: 'center', gap: 4, minWidth: 60, justifyContent: 'flex-end' },
   iconBtn:        { padding: 6, borderRadius: radius.sm },
-  iconBtnHovered: { padding: 6, borderRadius: radius.sm, backgroundColor: colors.background },
+  iconBtnHovered: { padding: 6, borderRadius: radius.sm, backgroundColor: colors.primaryEnd, opacity: 0.5 },
   topTitle: { ...textStyles.h3, color: colors.textSecondary },
 
   scroll: {
