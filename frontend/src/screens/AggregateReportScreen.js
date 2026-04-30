@@ -201,21 +201,19 @@ export default function AggregateReportScreen({ route, navigation }) {
           {isCompleted && (
             <Pressable
               onPress={handleCopy}
-              onHoverIn={() => console.log('hover in')}
-              style={({ hovered }) => {
-                console.log('hovered:', hovered);
-                return [
-                  styles.iconBtn,
-                  hovered && styles.iconBtnHovered,
-                ];
-              }}
+              style={styles.iconBtn}
             >
-              <Animated.View style={{ opacity: copyAnim }}>
-                {copied
-                  ? <Check size={18} color={colors.primary} />
-                  : <Copy size={18} color={colors.textDisabled} />
-                }
-              </Animated.View>
+              {({ hovered }) => (
+                <Animated.View style={[
+                  { opacity: copyAnim },
+                  hovered && { backgroundColor: colors.background, borderRadius: radius.sm, padding: 6 },
+                ]}>
+                  {copied
+                    ? <Check size={18} color={colors.primary} />
+                    : <Copy size={18} color={hovered ? colors.textSecondary : colors.textDisabled} />
+                  }
+                </Animated.View>
+              )}
             </Pressable>
           )}
           <TouchableOpacity onPress={() => setShowFeedbackModal(true)} style={styles.iconBtn}>
