@@ -105,7 +105,6 @@ export default function AggregateReportScreen({ route, navigation }) {
   const [isTimedOut, setIsTimedOut]   = useState(false);
   const [copied, setCopied]           = useState(false);
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
-  const [copyHovered, setCopyHovered] = useState(false);
   const pollRef    = useRef(null);
   const elapsedRef = useRef(0);
   const copyAnim   = useRef(new Animated.Value(1)).current;
@@ -202,9 +201,11 @@ export default function AggregateReportScreen({ route, navigation }) {
           {isCompleted && (
             <Pressable
               onPress={handleCopy}
-              onMouseEnter={() => setCopyHovered(true)}
-              onMouseLeave={() => setCopyHovered(false)}
-              style={[styles.iconBtn, copyHovered && styles.iconBtnHovered]}
+              onHoverIn={() => console.log('hover in')}
+              style={({ hovered }) => [
+                styles.iconBtn,
+                hovered && styles.iconBtnHovered,
+              ]}
             >
               <Animated.View style={{ opacity: copyAnim }}>
                 {copied
